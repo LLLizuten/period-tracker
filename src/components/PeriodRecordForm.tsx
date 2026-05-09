@@ -1,14 +1,14 @@
 import { useRef, useState } from "react";
-import {
-  Alert,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { Alert, StyleSheet, TextInput, View } from "react-native";
 
+import { colors, fontSizes, radii, spacing } from "../theme";
 import type { DateKey } from "../types/period";
+import {
+  LabelText,
+  PrimaryButton,
+  ScreenSection,
+  SecondaryButton,
+} from "./ui";
 
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -76,114 +76,71 @@ export function PeriodRecordForm({
   };
 
   return (
-    <View style={styles.container}>
+    <ScreenSection>
       <View style={styles.field}>
-        <Text style={styles.label}>开始日期</Text>
+        <LabelText>开始日期</LabelText>
         <TextInput
           value={startDate}
           onChangeText={setStartDate}
           placeholder="YYYY-MM-DD"
+          placeholderTextColor={colors.textSubtle}
           autoCapitalize="none"
           editable={!isSubmitting}
-          style={styles.input}
+          style={[styles.input, isSubmitting ? styles.disabledInput : null]}
         />
       </View>
 
       <View style={styles.field}>
-        <Text style={styles.label}>结束日期</Text>
+        <LabelText>结束日期</LabelText>
         <TextInput
           value={endDate}
           onChangeText={setEndDate}
           placeholder="YYYY-MM-DD"
+          placeholderTextColor={colors.textSubtle}
           autoCapitalize="none"
           editable={!isSubmitting}
-          style={styles.input}
+          style={[styles.input, isSubmitting ? styles.disabledInput : null]}
         />
       </View>
 
       <View style={styles.actions}>
         {onCancel ? (
-          <Pressable
-            onPress={onCancel}
-            disabled={isSubmitting}
-            style={({ pressed }) => [
-              styles.button,
-              styles.secondaryButton,
-              (pressed || isSubmitting) && styles.mutedButton,
-            ]}
-          >
-            <Text style={styles.secondaryButtonText}>取消</Text>
-          </Pressable>
+          <SecondaryButton onPress={onCancel} disabled={isSubmitting}>
+            取消
+          </SecondaryButton>
         ) : null}
 
-        <Pressable
-          onPress={handleSubmit}
-          disabled={isSubmitting}
-          style={({ pressed }) => [
-            styles.button,
-            styles.primaryButton,
-            (pressed || isSubmitting) && styles.mutedButton,
-          ]}
-        >
-          <Text style={styles.primaryButtonText}>
-            {isSubmitting ? "保存中..." : submitLabel}
-          </Text>
-        </Pressable>
+        <PrimaryButton onPress={handleSubmit} disabled={isSubmitting}>
+          {isSubmitting ? "保存中..." : submitLabel}
+        </PrimaryButton>
       </View>
-    </View>
+    </ScreenSection>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    gap: 16,
-  },
   field: {
-    gap: 8,
-  },
-  label: {
-    color: "#1f2937",
-    fontSize: 16,
-    fontWeight: "600",
+    gap: spacing.sm,
   },
   input: {
-    borderColor: "#d1d5db",
-    borderRadius: 8,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radii.md,
     borderWidth: 1,
-    color: "#111827",
-    fontSize: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    color: colors.text,
+    fontSize: fontSizes.lg,
+    minHeight: 44,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  disabledInput: {
+    backgroundColor: colors.surfaceMuted,
+    color: colors.textMuted,
   },
   actions: {
     flexDirection: "row",
-    gap: 12,
+    flexWrap: "wrap",
+    gap: spacing.md,
     justifyContent: "flex-end",
-  },
-  button: {
-    alignItems: "center",
-    borderRadius: 8,
-    minWidth: 88,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  primaryButton: {
-    backgroundColor: "#2563eb",
-  },
-  primaryButtonText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  secondaryButton: {
-    backgroundColor: "#f3f4f6",
-  },
-  secondaryButtonText: {
-    color: "#374151",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  mutedButton: {
-    opacity: 0.6,
   },
 });

@@ -1,19 +1,19 @@
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Alert, ScrollView, StyleSheet, Text } from "react-native";
 
+import {
+  DangerButton,
+  LabelText,
+  ScreenSection,
+  SectionCard,
+} from "../../src/components/ui";
 import {
   clearPeriodRecords,
   initPeriodDatabase,
   listPeriodRecords,
 } from "../../src/db/periodRecords";
+import { colors, fontSizes, spacing } from "../../src/theme";
 
 export default function SettingsScreen() {
   const [recordCount, setRecordCount] = useState(0);
@@ -86,107 +86,75 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.section}>
+      <ScreenSection style={styles.headerSection}>
         <Text style={styles.title}>设置</Text>
         <Text style={styles.subtleText}>本地数据与隐私</Text>
-      </View>
+      </ScreenSection>
 
-      <View style={styles.panel}>
-        <Text style={styles.label}>数据保存说明</Text>
+      <ScreenSection>
+        <SectionCard style={styles.infoCard}>
+          <LabelText>数据保存说明</LabelText>
         <Text style={styles.bodyText}>
           数据仅保存在本机 SQLite，不需要账号、不上传、不同步、不调用远程服务。
         </Text>
-      </View>
+        </SectionCard>
 
-      <View style={styles.panel}>
-        <Text style={styles.label}>当前本地记录</Text>
+        <SectionCard style={styles.infoCard}>
+          <LabelText>当前本地记录</LabelText>
         <Text style={styles.countText}>{isLoading ? "加载中..." : `${recordCount} 条`}</Text>
-      </View>
+        </SectionCard>
+      </ScreenSection>
 
-      <View style={styles.section}>
-        <Text style={styles.label}>数据操作</Text>
-        <Pressable
+      <SectionCard style={styles.dangerCard}>
+        <LabelText style={styles.dangerTitle}>数据操作</LabelText>
+        <DangerButton
           onPress={handleClearRecords}
           disabled={isClearDisabled}
-          style={({ pressed }) => [
-            styles.clearButton,
-            isClearDisabled && styles.disabledButton,
-            pressed && !isClearDisabled && styles.pressedButton,
-          ]}
         >
-          <Text
-            style={[
-              styles.clearButtonText,
-              isClearDisabled && styles.disabledButtonText,
-            ]}
-          >
-            {isClearing ? "清空中..." : "清空所有记录"}
-          </Text>
-        </Pressable>
-      </View>
+          {isClearing ? "清空中..." : "清空所有记录"}
+        </DangerButton>
+      </SectionCard>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    gap: 20,
-    padding: 20,
+    backgroundColor: colors.background,
+    gap: spacing.xl,
+    padding: spacing.xl,
   },
-  section: {
-    gap: 8,
+  headerSection: {
+    gap: spacing.sm,
   },
   title: {
-    color: "#111827",
+    color: colors.text,
     fontSize: 28,
     fontWeight: "700",
   },
   subtleText: {
-    color: "#6b7280",
-    fontSize: 15,
+    color: colors.textMuted,
+    fontSize: fontSizes.md,
   },
-  panel: {
-    backgroundColor: "#f9fafb",
-    borderColor: "#e5e7eb",
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 8,
-    padding: 16,
-  },
-  label: {
-    color: "#374151",
-    fontSize: 16,
-    fontWeight: "600",
+  infoCard: {
+    gap: spacing.sm,
   },
   bodyText: {
-    color: "#111827",
-    fontSize: 16,
+    color: colors.text,
+    fontSize: fontSizes.lg,
     lineHeight: 24,
   },
   countText: {
-    color: "#111827",
+    color: colors.text,
     fontSize: 22,
     fontWeight: "700",
   },
-  clearButton: {
-    alignItems: "center",
-    backgroundColor: "#dc2626",
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+  dangerCard: {
+    backgroundColor: colors.roseSurface,
+    borderColor: colors.rose,
+    gap: spacing.md,
   },
-  clearButtonText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  disabledButton: {
-    backgroundColor: "#e5e7eb",
-  },
-  disabledButtonText: {
-    color: "#6b7280",
-  },
-  pressedButton: {
-    opacity: 0.7,
+  dangerTitle: {
+    color: colors.rose,
   },
 });

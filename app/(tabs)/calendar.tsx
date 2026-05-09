@@ -10,12 +10,14 @@ import {
 } from "react-native";
 
 import { PeriodRecordForm } from "../../src/components/PeriodRecordForm";
+import { DangerButton, PrimaryButton, SectionCard } from "../../src/components/ui";
 import {
   deletePeriodRecord,
   initPeriodDatabase,
   listPeriodRecords,
   updatePeriodRecord,
 } from "../../src/db/periodRecords";
+import { colors, fontSizes, radii, spacing } from "../../src/theme";
 import type { DateKey, PeriodRecord } from "../../src/types/period";
 import { getRecordForDate, isPeriodDate } from "../../src/utils/calendar";
 import {
@@ -226,26 +228,12 @@ export default function CalendarScreen() {
         </Text>
 
         <View style={styles.actions}>
-          <Pressable
-            onPress={() => setIsEditing(true)}
-            style={({ pressed }) => [
-              styles.actionButton,
-              styles.primaryButton,
-              pressed && styles.pressedButton,
-            ]}
-          >
-            <Text style={styles.primaryButtonText}>编辑</Text>
-          </Pressable>
-          <Pressable
-            onPress={handleDeleteRecord}
-            style={({ pressed }) => [
-              styles.actionButton,
-              styles.dangerButton,
-              pressed && styles.pressedButton,
-            ]}
-          >
-            <Text style={styles.dangerButtonText}>删除</Text>
-          </Pressable>
+          <PrimaryButton onPress={() => setIsEditing(true)} style={styles.actionButton}>
+            编辑
+          </PrimaryButton>
+          <DangerButton onPress={handleDeleteRecord} style={styles.actionButton}>
+            删除
+          </DangerButton>
         </View>
       </View>
     );
@@ -292,70 +280,85 @@ export default function CalendarScreen() {
         <View style={styles.daysGrid}>{monthDays.map(renderDay)}</View>
       </View>
 
-      <View style={styles.detailSection}>
+      <SectionCard style={styles.detailSection}>
         <Text style={styles.label}>
           {selectedDateObject.getMonth() + 1}月{selectedDateObject.getDate()}日
         </Text>
         {renderSelectedDetail()}
-      </View>
+      </SectionCard>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    gap: 20,
-    padding: 20,
+    backgroundColor: colors.background,
+    gap: spacing.xl,
+    padding: spacing.xl,
   },
   header: {
-    gap: 8,
+    gap: spacing.sm,
   },
   title: {
-    color: "#111827",
+    color: colors.text,
     fontSize: 28,
     fontWeight: "700",
   },
   subtleText: {
-    color: "#6b7280",
-    fontSize: 15,
+    color: colors.textMuted,
+    fontSize: fontSizes.md,
   },
   monthHeader: {
     alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radii.lg,
+    borderWidth: 1,
     flexDirection: "row",
-    gap: 12,
+    gap: spacing.md,
     justifyContent: "space-between",
+    padding: spacing.md,
   },
   monthButton: {
     alignItems: "center",
-    backgroundColor: "#f3f4f6",
-    borderRadius: 8,
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    borderWidth: 1,
     minWidth: 76,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
   monthButtonText: {
-    color: "#374151",
-    fontSize: 15,
+    color: colors.text,
+    fontSize: fontSizes.md,
     fontWeight: "600",
   },
   monthTitle: {
-    color: "#111827",
+    color: colors.text,
     flex: 1,
-    fontSize: 18,
+    fontSize: fontSizes.xl,
     fontWeight: "700",
     textAlign: "center",
   },
   calendar: {
-    gap: 8,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    gap: spacing.sm,
+    padding: spacing.md,
   },
   weekRow: {
     flexDirection: "row",
   },
   weekText: {
-    color: "#6b7280",
+    color: colors.textSubtle,
     flex: 1,
-    fontSize: 13,
+    fontSize: fontSizes.sm,
     fontWeight: "600",
+    lineHeight: 18,
+    paddingVertical: spacing.xs,
     textAlign: "center",
   },
   daysGrid: {
@@ -365,41 +368,42 @@ const styles = StyleSheet.create({
   dayCell: {
     alignItems: "center",
     aspectRatio: 1,
-    borderColor: "#e5e7eb",
-    borderRadius: 8,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radii.md,
     borderWidth: 1,
     justifyContent: "center",
-    marginBottom: 6,
-    marginHorizontal: "0.7%",
-    width: "12.88%",
+    minHeight: 42,
+    width: "14.2857%",
   },
   otherMonthDay: {
-    backgroundColor: "#f9fafb",
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
   },
   periodDay: {
-    backgroundColor: "#fef2f2",
-    borderColor: "#fecaca",
+    backgroundColor: colors.roseSurface,
+    borderColor: colors.rose,
   },
   selectedDay: {
-    backgroundColor: "#2563eb",
-    borderColor: "#2563eb",
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   pressedDay: {
     opacity: 0.72,
   },
   dayText: {
-    color: "#111827",
-    fontSize: 16,
+    color: colors.text,
+    fontSize: fontSizes.lg,
     fontWeight: "600",
   },
   otherMonthText: {
-    color: "#9ca3af",
+    color: colors.disabled,
   },
   periodDayText: {
-    color: "#991b1b",
+    color: colors.rose,
   },
   selectedDayText: {
-    color: "#ffffff",
+    color: colors.onPrimary,
   },
   periodDot: {
     borderRadius: 3,
@@ -408,67 +412,43 @@ const styles = StyleSheet.create({
     width: 6,
   },
   visiblePeriodDot: {
-    backgroundColor: "#dc2626",
+    backgroundColor: colors.rose,
   },
   hiddenPeriodDot: {
     backgroundColor: "transparent",
   },
   detailSection: {
-    borderColor: "#e5e7eb",
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 12,
-    padding: 16,
+    gap: spacing.md,
   },
   detailContent: {
-    gap: 10,
+    gap: spacing.sm,
   },
   label: {
-    color: "#374151",
-    fontSize: 16,
+    color: colors.textMuted,
+    fontSize: fontSizes.lg,
     fontWeight: "600",
   },
   valueText: {
-    color: "#111827",
-    fontSize: 18,
+    color: colors.text,
+    fontSize: fontSizes.xl,
     fontWeight: "600",
   },
   helperText: {
-    color: "#4b5563",
-    fontSize: 16,
+    color: colors.textMuted,
+    fontSize: fontSizes.lg,
   },
   emptyText: {
-    color: "#6b7280",
-    fontSize: 16,
+    color: colors.textSubtle,
+    fontSize: fontSizes.lg,
   },
   actions: {
     flexDirection: "row",
-    gap: 12,
+    gap: spacing.md,
     justifyContent: "flex-end",
-    marginTop: 4,
+    marginTop: spacing.xs,
   },
   actionButton: {
-    alignItems: "center",
-    borderRadius: 8,
     minWidth: 88,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  primaryButton: {
-    backgroundColor: "#2563eb",
-  },
-  primaryButtonText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  dangerButton: {
-    backgroundColor: "#fee2e2",
-  },
-  dangerButtonText: {
-    color: "#991b1b",
-    fontSize: 16,
-    fontWeight: "600",
   },
   pressedButton: {
     opacity: 0.7,

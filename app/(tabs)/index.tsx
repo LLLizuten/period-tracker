@@ -2,7 +2,6 @@ import { useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
   Alert,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,10 +10,18 @@ import {
 
 import { PeriodRecordForm } from "../../src/components/PeriodRecordForm";
 import {
+  EmptyText,
+  LabelText,
+  PrimaryButton,
+  ScreenSection,
+  SectionCard,
+} from "../../src/components/ui";
+import {
   createPeriodRecord,
   initPeriodDatabase,
   listPeriodRecords,
 } from "../../src/db/periodRecords";
+import { colors, fontSizes, radii, spacing } from "../../src/theme";
 import type { DateKey, PeriodRecord } from "../../src/types/period";
 import { isPeriodDate } from "../../src/utils/calendar";
 import { daysBetween, formatDisplayDate, toDateKey } from "../../src/utils/date";
@@ -83,7 +90,7 @@ export default function HomeScreen() {
 
   const renderLatestRecord = () => {
     if (!latestRecord) {
-      return <Text style={styles.emptyText}>暂无记录</Text>;
+      return <EmptyText style={styles.cardEmptyText}>暂无记录</EmptyText>;
     }
 
     return (
@@ -96,7 +103,7 @@ export default function HomeScreen() {
 
   const renderPrediction = () => {
     if (!prediction || daysUntilNextPeriod === null) {
-      return <Text style={styles.emptyText}>暂无预计日期</Text>;
+      return <EmptyText style={styles.cardEmptyText}>暂无预计日期</EmptyText>;
     }
 
     const dayText =
@@ -118,29 +125,44 @@ export default function HomeScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.section}>
+      <ScreenSection style={styles.headerSection}>
         <Text style={styles.title}>首页</Text>
         <Text style={styles.subtleText}>今天：{formatDisplayDate(todayKey)}</Text>
-      </View>
+      </ScreenSection>
 
-      <View style={styles.statusPanel}>
-        <Text style={styles.label}>今日状态</Text>
+      <SectionCard
+        style={[
+          styles.statusCard,
+          isTodayInPeriod ? styles.periodStatusCard : styles.normalStatusCard,
+        ]}
+      >
+        <LabelText>今日状态</LabelText>
         <Text style={styles.statusText}>
           {isTodayInPeriod ? "处于已记录经期内" : "不在已记录经期内"}
         </Text>
-      </View>
+      </SectionCard>
 
-      <View style={styles.section}>
-        <Text style={styles.label}>最近一次经期记录</Text>
-        {isLoading ? <Text style={styles.emptyText}>加载中...</Text> : renderLatestRecord()}
-      </View>
+      <ScreenSection>
+        <SectionCard style={styles.infoCard}>
+          <LabelText>最近一次经期记录</LabelText>
+          {isLoading ? (
+            <EmptyText style={styles.cardEmptyText}>加载中...</EmptyText>
+          ) : (
+            renderLatestRecord()
+          )}
+        </SectionCard>
 
-      <View style={styles.section}>
-        <Text style={styles.label}>预计下一次开始日期</Text>
-        {isLoading ? <Text style={styles.emptyText}>加载中...</Text> : renderPrediction()}
-      </View>
+        <SectionCard style={styles.infoCard}>
+          <LabelText>预计下一次开始日期</LabelText>
+          {isLoading ? (
+            <EmptyText style={styles.cardEmptyText}>加载中...</EmptyText>
+          ) : (
+            renderPrediction()
+          )}
+        </SectionCard>
+      </ScreenSection>
 
-      <View style={styles.section}>
+      <ScreenSection>
         {isAdding ? (
           <PeriodRecordForm
             key={formKey}
@@ -149,97 +171,80 @@ export default function HomeScreen() {
             onCancel={() => setIsAdding(false)}
           />
         ) : (
-          <View style={styles.addSection}>
+          <SectionCard style={styles.addCard}>
             {records.length === 0 && !isLoading ? (
-              <Text style={styles.emptyText}>添加第一条记录</Text>
+              <EmptyText>添加第一条记录</EmptyText>
             ) : null}
-            <Pressable
+            <PrimaryButton
               onPress={() => {
                 if (!isLoading) {
                   setIsAdding(true);
                 }
               }}
               disabled={isLoading}
-              style={({ pressed }) => [
-                styles.addButton,
-                (pressed || isLoading) && styles.pressedButton,
-              ]}
             >
-              <Text style={styles.addButtonText}>新增记录</Text>
-            </Pressable>
-          </View>
+              新增记录
+            </PrimaryButton>
+          </SectionCard>
         )}
-      </View>
+      </ScreenSection>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    gap: 20,
-    padding: 20,
+    backgroundColor: colors.background,
+    gap: spacing.xl,
+    padding: spacing.xl,
   },
-  section: {
-    gap: 8,
+  headerSection: {
+    gap: spacing.sm,
   },
   title: {
-    color: "#111827",
+    color: colors.text,
     fontSize: 28,
     fontWeight: "700",
   },
   subtleText: {
-    color: "#6b7280",
-    fontSize: 15,
+    color: colors.textMuted,
+    fontSize: fontSizes.md,
   },
-  statusPanel: {
-    backgroundColor: "#f9fafb",
-    borderColor: "#e5e7eb",
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 8,
-    padding: 16,
+  statusCard: {
+    borderRadius: radii.lg,
+    gap: spacing.sm,
   },
-  label: {
-    color: "#374151",
-    fontSize: 16,
-    fontWeight: "600",
+  periodStatusCard: {
+    backgroundColor: colors.roseSurface,
+    borderColor: colors.rose,
+  },
+  normalStatusCard: {
+    backgroundColor: colors.tealSurface,
+    borderColor: colors.teal,
+  },
+  infoCard: {
+    gap: spacing.sm,
   },
   statusText: {
-    color: "#111827",
+    color: colors.text,
     fontSize: 22,
     fontWeight: "700",
   },
   valueText: {
-    color: "#111827",
+    color: colors.text,
     fontSize: 18,
   },
-  emptyText: {
-    color: "#6b7280",
-    fontSize: 16,
-  },
   predictionGroup: {
-    gap: 4,
+    gap: spacing.xs,
   },
   helperText: {
-    color: "#4b5563",
-    fontSize: 16,
+    color: colors.textMuted,
+    fontSize: fontSizes.lg,
   },
-  addSection: {
-    gap: 12,
+  cardEmptyText: {
+    textAlign: "left",
   },
-  addButton: {
-    alignItems: "center",
-    backgroundColor: "#2563eb",
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  addButtonText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  pressedButton: {
-    opacity: 0.7,
+  addCard: {
+    gap: spacing.md,
   },
 });
