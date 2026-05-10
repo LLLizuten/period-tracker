@@ -30,7 +30,7 @@ export const spacing = {
 
 export const radii = {
   sm: 8,
-  md: 14,
+  md: 20,
   lg: 22,
   xl: 28,
 } as const;
