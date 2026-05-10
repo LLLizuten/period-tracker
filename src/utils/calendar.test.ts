@@ -133,4 +133,32 @@ describe("calendar utilities", () => {
       }),
     ).toBe(true);
   });
+
+  test("hasOverlappingRecord 编辑时排除当前记录自身", () => {
+    const records = [
+      createRecord(1, "2026-05-10", "2026-05-12"),
+      createRecord(2, "2026-05-15", "2026-05-18"),
+    ];
+
+    expect(
+      hasOverlappingRecord(
+        records,
+        {
+          startDate: "2026-05-10",
+          endDate: "2026-05-12",
+        },
+        1,
+      ),
+    ).toBe(false);
+    expect(
+      hasOverlappingRecord(
+        records,
+        {
+          startDate: "2026-05-11",
+          endDate: "2026-05-16",
+        },
+        1,
+      ),
+    ).toBe(true);
+  });
 });

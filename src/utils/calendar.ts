@@ -34,11 +34,17 @@ export function isPeriodDate(records: PeriodRecord[], dateKey: DateKey): boolean
 export function hasOverlappingRecord(
   records: PeriodRecord[],
   input: DateRangeInput,
+  excludedRecordId?: number,
 ): boolean {
-  return records.some(
-    (record) =>
+  return records.some((record) => {
+    if (record.id === excludedRecordId) {
+      return false;
+    }
+
+    return (
       isDateInRange(input.startDate, record.startDate, record.endDate) ||
       isDateInRange(input.endDate, record.startDate, record.endDate) ||
-      isDateInRange(record.startDate, input.startDate, input.endDate),
-  );
+      isDateInRange(record.startDate, input.startDate, input.endDate)
+    );
+  });
 }
