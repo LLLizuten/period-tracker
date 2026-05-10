@@ -6,6 +6,11 @@ type DateRangeInput = {
   endDate: DateKey;
 };
 
+type PeriodRangePosition = {
+  isStart: boolean;
+  isEnd: boolean;
+};
+
 // 获取指定日期命中的经期记录；重叠时优先返回开始日期最新的记录。
 export function getRecordForDate(
   records: PeriodRecord[],
@@ -23,6 +28,23 @@ export function getRecordForDate(
   return matchedRecords.sort((first, second) =>
     second.startDate.localeCompare(first.startDate),
   )[0];
+}
+
+// 判断指定日期在命中的经期区间中处于开始、结束还是中间位置。
+export function getPeriodRangePosition(
+  records: PeriodRecord[],
+  dateKey: DateKey,
+): PeriodRangePosition | null {
+  const matchedRecord = getRecordForDate(records, dateKey);
+
+  if (!matchedRecord) {
+    return null;
+  }
+
+  return {
+    isStart: matchedRecord.startDate === dateKey,
+    isEnd: matchedRecord.endDate === dateKey,
+  };
 }
 
 // 判断指定日期是否属于任意一条经期记录。

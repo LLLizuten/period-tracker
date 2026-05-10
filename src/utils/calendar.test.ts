@@ -38,7 +38,12 @@ Object.defineProperties(globalThis, {
   },
 });
 
-const { getRecordForDate, hasOverlappingRecord, isPeriodDate } = jest.requireActual<
+const {
+  getPeriodRangePosition,
+  getRecordForDate,
+  hasOverlappingRecord,
+  isPeriodDate,
+} = jest.requireActual<
   typeof import("./calendar")
 >("./calendar");
 
@@ -84,6 +89,62 @@ describe("calendar utilities", () => {
 
     expect(getRecordForDate([olderRecord, newerRecord], "2026-05-13")).toBe(newerRecord);
     expect(getRecordForDate([newerRecord, olderRecord], "2026-05-13")).toBe(newerRecord);
+  });
+
+  test("getPeriodRangePosition 返回开始日位置", () => {
+    const records = [createRecord(1, "2026-05-09", "2026-05-13")];
+
+    expect(getPeriodRangePosition(records, "2026-05-09")).toEqual({
+      isEnd: false,
+      isStart: true,
+    });
+  });
+
+  test("getPeriodRangePosition 返回结束日位置", () => {
+    const records = [createRecord(1, "2026-05-09", "2026-05-13")];
+
+    expect(getPeriodRangePosition(records, "2026-05-13")).toEqual({
+      isEnd: true,
+      isStart: false,
+    });
+  });
+
+  test("getPeriodRangePosition 返回中间日位置", () => {
+    const records = [createRecord(1, "2026-05-09", "2026-05-13")];
+
+    expect(getPeriodRangePosition(records, "2026-05-11")).toEqual({
+      isEnd: false,
+      isStart: false,
+    });
+  });
+
+  test("getPeriodRangePosition 单日区间同时是开始和结束", () => {
+    const records = [createRecord(1, "2026-05-09", "2026-05-09")];
+
+    expect(getPeriodRangePosition(records, "2026-05-09")).toEqual({
+      isEnd: true,
+      isStart: true,
+    });
+  });
+
+  test("getPeriodRangePosition 非经期日返回 null", () => {
+    const records = [createRecord(1, "2026-05-09", "2026-05-13")];
+
+    expect(getPeriodRangePosition(records, "2026-05-08")).toBeNull();
+  });
+
+  test("getPeriodRangePosition 重叠记录优先使用开始日期较新的记录", () => {
+    const olderRecord = createRecord(1, "2026-05-09", "2026-05-14");
+    const newerRecord = createRecord(2, "2026-05-12", "2026-05-16");
+
+    expect(getPeriodRangePosition([olderRecord, newerRecord], "2026-05-13")).toEqual({
+      isEnd: false,
+      isStart: false,
+    });
+    expect(getPeriodRangePosition([olderRecord, newerRecord], "2026-05-12")).toEqual({
+      isEnd: false,
+      isStart: true,
+    });
   });
 
   test("查询日期不修改传入记录顺序", () => {

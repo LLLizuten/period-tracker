@@ -30,6 +30,7 @@ import {
 import { colors, fontSizes, radii, spacing } from "../../src/theme";
 import type { DateKey, PeriodRecord } from "../../src/types/period";
 import {
+  getPeriodRangePosition,
   getRecordForDate,
   hasOverlappingRecord,
   isPeriodDate,
@@ -474,9 +475,12 @@ export default function HomeScreen() {
 
   const renderDay = (day: (typeof monthDays)[number]) => {
     const dayRecord = getRecordForDate(records, day.dateKey);
+    const periodRangePosition = getPeriodRangePosition(records, day.dateKey);
     const isSelected = day.dateKey === selectedDate;
     const isMarked = isPeriodDate(records, day.dateKey);
     const isPendingStart = day.dateKey === pendingStartDate;
+    const isSingleDayPeriod =
+      periodRangePosition?.isStart === true && periodRangePosition?.isEnd === true;
 
     return (
       <Pressable
@@ -486,32 +490,42 @@ export default function HomeScreen() {
         style={({ pressed }) => [
           styles.dayCell,
           !day.isCurrentMonth && styles.otherMonthDay,
-          isMarked && styles.periodDay,
-          isPendingStart && styles.pendingStartDay,
-          isSelected && styles.selectedDay,
-          isSelected && isPendingStart ? styles.selectedPendingStartDay : null,
           pressed && !isInteractionLocked ? styles.pressedDay : null,
           isInteractionLocked ? styles.disabledInteractiveItem : null,
         ]}
       >
-        <Text
-          style={[
-            styles.dayText,
-            !day.isCurrentMonth && styles.otherMonthText,
-            isMarked && styles.periodDayText,
-            isPendingStart && styles.pendingStartDayText,
-            isSelected && styles.selectedDayText,
-          ]}
-          numberOfLines={1}
-        >
-          {day.dayOfMonth}
-        </Text>
-        <View
-          style={[
-            styles.periodDot,
-            dayRecord ? styles.visiblePeriodDot : styles.hiddenPeriodDot,
-          ]}
-        />
+        <View style={styles.dayTrack}>
+          <View
+            style={[
+              styles.periodRangeBand,
+              isMarked ? styles.visiblePeriodRangeBand : null,
+              periodRangePosition?.isStart ? styles.periodRangeBandStart : null,
+              periodRangePosition?.isEnd ? styles.periodRangeBandEnd : null,
+              isSingleDayPeriod ? styles.periodRangeBandSingleDay : null,
+            ]}
+          />
+          <View
+            style={[
+              styles.dayContent,
+              isPendingStart && styles.pendingStartDay,
+              isSelected && styles.selectedDay,
+              isSelected && isPendingStart ? styles.selectedPendingStartDay : null,
+            ]}
+          >
+            <Text
+              style={[
+                styles.dayText,
+                !day.isCurrentMonth && styles.otherMonthText,
+                dayRecord && styles.periodDayText,
+                isPendingStart && styles.pendingStartDayText,
+                isSelected && styles.selectedDayText,
+              ]}
+              numberOfLines={1}
+            >
+              {day.dayOfMonth}
+            </Text>
+          </View>
+        </View>
       </Pressable>
     );
   };
@@ -851,19 +865,55 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   dayCell: {
-    alignItems: "center",
     aspectRatio: 1,
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    justifyContent: "center",
     minHeight: 42,
+    paddingVertical: spacing.xs,
     width: "14.2857%",
   },
   otherMonthDay: {
     opacity: 0.45,
   },
-  periodDay: {
+  dayTrack: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+    position: "relative",
+  },
+  periodRangeBand: {
+    backgroundColor: "transparent",
+    height: 28,
+    left: 4,
+    overflow: "hidden",
+    position: "absolute",
+    right: 4,
+  },
+  visiblePeriodRangeBand: {
     backgroundColor: colors.surfaceSoft,
+  },
+  periodRangeBandStart: {
+    left: 8,
+    borderBottomLeftRadius: radii.md,
+    borderTopLeftRadius: radii.md,
+  },
+  periodRangeBandEnd: {
+    right: 8,
+    borderBottomRightRadius: radii.md,
+    borderTopRightRadius: radii.md,
+  },
+  periodRangeBandSingleDay: {
+    height: 34,
+    left: 2,
+    borderRadius: radii.md,
+    right: 2,
+  },
+  dayContent: {
+    alignItems: "center",
+    aspectRatio: 1,
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    justifyContent: "center",
+    maxWidth: 42,
+    width: "100%",
   },
   pendingStartDay: {
     borderColor: colors.primary,
@@ -895,18 +945,6 @@ const styles = StyleSheet.create({
   },
   selectedDayText: {
     color: colors.onPrimary,
-  },
-  periodDot: {
-    borderRadius: 3,
-    height: 6,
-    marginTop: 4,
-    width: 6,
-  },
-  visiblePeriodDot: {
-    backgroundColor: colors.rose,
-  },
-  hiddenPeriodDot: {
-    backgroundColor: "transparent",
   },
   detailSection: {
     backgroundColor: colors.surfaceSoft,
