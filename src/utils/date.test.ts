@@ -45,6 +45,7 @@ const {
   getMonthMatrix,
   isDateInRange,
   parseDateKey,
+  sortDateRange,
   toDateKey,
 } = jest.requireActual<typeof import("./date")>("./date");
 
@@ -108,5 +109,20 @@ describe("date utilities", () => {
 
   test("formatDisplayDate 输出易读中文日期", () => {
     expect(formatDisplayDate("2026-05-09")).toBe("2026年5月9日");
+  });
+
+  test("sortDateRange 按自然日期返回有序区间", () => {
+    expect(sortDateRange("2026-05-09", "2026-05-13")).toEqual({
+      startDate: "2026-05-09",
+      endDate: "2026-05-13",
+    });
+    expect(sortDateRange("2026-05-13", "2026-05-09")).toEqual({
+      startDate: "2026-05-09",
+      endDate: "2026-05-13",
+    });
+    expect(sortDateRange("2026-05-09", "2026-05-09")).toEqual({
+      startDate: "2026-05-09",
+      endDate: "2026-05-09",
+    });
   });
 });

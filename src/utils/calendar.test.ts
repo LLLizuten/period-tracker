@@ -38,9 +38,9 @@ Object.defineProperties(globalThis, {
   },
 });
 
-const { getRecordForDate, isPeriodDate } = jest.requireActual<typeof import("./calendar")>(
-  "./calendar",
-);
+const { getRecordForDate, hasOverlappingRecord, isPeriodDate } = jest.requireActual<
+  typeof import("./calendar")
+>("./calendar");
 
 import type { PeriodRecord } from "../types/period";
 
@@ -97,5 +97,40 @@ describe("calendar utilities", () => {
 
     expect(isPeriodDate(records, "2026-05-13")).toBe(true);
     expect(records.map((record) => record.id)).toEqual([2, 1, 3]);
+  });
+
+  test("hasOverlappingRecord 判断新区间是否与已有记录相交", () => {
+    const records = [createRecord(1, "2026-05-10", "2026-05-12")];
+
+    expect(
+      hasOverlappingRecord(records, {
+        startDate: "2026-05-08",
+        endDate: "2026-05-09",
+      }),
+    ).toBe(false);
+    expect(
+      hasOverlappingRecord(records, {
+        startDate: "2026-05-13",
+        endDate: "2026-05-14",
+      }),
+    ).toBe(false);
+    expect(
+      hasOverlappingRecord(records, {
+        startDate: "2026-05-08",
+        endDate: "2026-05-14",
+      }),
+    ).toBe(true);
+    expect(
+      hasOverlappingRecord(records, {
+        startDate: "2026-05-11",
+        endDate: "2026-05-11",
+      }),
+    ).toBe(true);
+    expect(
+      hasOverlappingRecord(records, {
+        startDate: "2026-05-12",
+        endDate: "2026-05-14",
+      }),
+    ).toBe(true);
   });
 });

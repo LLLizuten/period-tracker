@@ -49,6 +49,24 @@ export function isDateInRange(
   return daysBetween(startDate, dateKey) >= 0 && daysBetween(dateKey, endDate) >= 0;
 }
 
+// 将任意两个日期整理为有序闭区间，降低用户先选结束日期的操作成本。
+export function sortDateRange(
+  firstDate: DateKey,
+  secondDate: DateKey,
+): { startDate: DateKey; endDate: DateKey } {
+  if (daysBetween(firstDate, secondDate) >= 0) {
+    return {
+      startDate: firstDate,
+      endDate: secondDate,
+    };
+  }
+
+  return {
+    startDate: secondDate,
+    endDate: firstDate,
+  };
+}
+
 // 生成 6 行 7 列月历矩阵，包含前后月份补齐日期。
 export function getMonthMatrix(year: number, monthIndex: number): MonthDay[] {
   const firstDay = new Date(year, monthIndex, 1, 12);
