@@ -2,6 +2,7 @@ import { useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -94,6 +95,12 @@ export default function HomeScreen() {
     () => isPeriodDate(records, todayKey),
     [records, todayKey],
   );
+  const isVisibleMonthTodayMonth =
+    visibleMonth.getFullYear() === today.getFullYear() &&
+    visibleMonth.getMonth() === today.getMonth();
+  const isSelectedDateToday = selectedDate === todayKey;
+  const shouldShowBackToToday =
+    !isVisibleMonthTodayMonth || !isSelectedDateToday;
   const daysUntilNextPeriod = prediction
     ? daysBetween(todayKey, prediction.nextStartDate)
     : null;
@@ -210,26 +217,29 @@ export default function HomeScreen() {
     ],
   );
 
-  const changeMonth = (offset: number) => {
-    if (isInteractionLocked) {
-      return;
-    }
+  const changeMonth = useCallback(
+    (offset: number) => {
+      if (isInteractionLocked) {
+        return;
+      }
 
-    if (pendingStartDate && !isEditing) {
-      setVisibleMonth(
-        (currentMonth) =>
-          new Date(currentMonth.getFullYear(), currentMonth.getMonth() + offset, 1, 12),
-      );
-      return;
-    }
+      if (pendingStartDate && !isEditing) {
+        setVisibleMonth(
+          (currentMonth) =>
+            new Date(currentMonth.getFullYear(), currentMonth.getMonth() + offset, 1, 12),
+        );
+        return;
+      }
 
-    runWithInterruptConfirmation(() => {
-      setVisibleMonth(
-        (currentMonth) =>
-          new Date(currentMonth.getFullYear(), currentMonth.getMonth() + offset, 1, 12),
-      );
-    });
-  };
+      runWithInterruptConfirmation(() => {
+        setVisibleMonth(
+          (currentMonth) =>
+            new Date(currentMonth.getFullYear(), currentMonth.getMonth() + offset, 1, 12),
+        );
+      });
+    },
+    [isEditing, isInteractionLocked, pendingStartDate, runWithInterruptConfirmation],
+  );
 
   const goToToday = () => {
     if (isInteractionLocked) {
@@ -421,38 +431,44 @@ export default function HomeScreen() {
     }
   };
 
-  const renderLatestRecord = () => {
-    if (!latestRecord) {
-      return <EmptyText style={styles.cardEmptyText}>暂无记录</EmptyText>;
-    }
+  // 顶部主状态区集中展示当天状态、最近记录与预测结果，替代原来的三张摘要卡。
+  const renderHeroSummary = () => {
+    const statusTitle = isTodayInPeriod ? "今天处于经期中" : "今天不在经期内";
+    const predictionText =
+      daysUntilNextPeriod === null
+        ? "继续记录后会生成更稳定的预测"
+        : daysUntilNextPeriod > 0
+          ? `距离下一次预计开始还有 ${daysUntilNextPeriod} 天`
+          : daysUntilNextPeriod === 0
+            ? "预计今天开始"
+            : `预计开始日已过 ${Math.abs(daysUntilNextPeriod)} 天`;
 
     return (
-      <Text style={styles.valueText}>
-        {formatDisplayDate(latestRecord.startDate)} 至{" "}
-        {formatDisplayDate(latestRecord.endDate)}
-      </Text>
-    );
-  };
-
-  const renderPrediction = () => {
-    if (!prediction || daysUntilNextPeriod === null) {
-      return <EmptyText style={styles.cardEmptyText}>暂无预计日期</EmptyText>;
-    }
-
-    const dayText =
-      daysUntilNextPeriod > 0
-        ? `还有 ${daysUntilNextPeriod} 天`
-        : daysUntilNextPeriod === 0
-          ? "预计今天开始"
-          : `已过 ${Math.abs(daysUntilNextPeriod)} 天`;
-
-    return (
-      <View style={styles.predictionGroup}>
-        <Text style={styles.valueText}>
-          {formatDisplayDate(prediction.nextStartDate)}
-        </Text>
-        <Text style={styles.helperText}>{dayText}</Text>
-      </View>
+      <SectionCard style={styles.heroCard}>
+        <View style={styles.heroHeader}>
+          <LabelText>Today</LabelText>
+          <Text style={styles.heroDate}>今天：{formatDisplayDate(todayKey)}</Text>
+        </View>
+        <Text style={styles.heroTitle}>{statusTitle}</Text>
+        <Text style={styles.heroSubtitle}>{predictionText}</Text>
+        <View style={styles.heroMetaGrid}>
+          <View style={styles.heroMetaCard}>
+            <Text style={styles.heroMetaLabel}>最近记录</Text>
+            <Text style={styles.heroMetaValue}>
+              {latestRecord
+                ? `${formatDisplayDate(latestRecord.startDate)} - ${formatDisplayDate(latestRecord.endDate)}`
+                : "暂无记录"}
+            </Text>
+          </View>
+          <View style={styles.heroMetaCard}>
+            <Text style={styles.heroMetaLabel}>预计开始</Text>
+            <Text style={styles.heroMetaValue}>
+              {prediction ? formatDisplayDate(prediction.nextStartDate) : "暂无预计日期"}
+            </Text>
+          </View>
+        </View>
+        {/* <Text style={styles.heroFootnote}>预测基于历史记录，仅供参考。</Text> */}
+      </SectionCard>
     );
   };
 
@@ -473,8 +489,9 @@ export default function HomeScreen() {
           isMarked && styles.periodDay,
           isPendingStart && styles.pendingStartDay,
           isSelected && styles.selectedDay,
+          isSelected && isPendingStart ? styles.selectedPendingStartDay : null,
           pressed && !isInteractionLocked ? styles.pressedDay : null,
-          isInteractionLocked ? styles.disabledMonthButton : null,
+          isInteractionLocked ? styles.disabledInteractiveItem : null,
         ]}
       >
         <Text
@@ -506,36 +523,30 @@ export default function HomeScreen() {
 
     if (isEditing && selectedRecord) {
       return (
-        <View style={styles.markPanel}>
-          <Text style={styles.valueText}>编辑已记录经期</Text>
-          <Text style={styles.helperText}>
-            直接调整开始和结束日期，保存时会自动按时间顺序整理区间。
-          </Text>
-          <PeriodRecordForm
-            key={selectedRecord.id}
-            initialStartDate={selectedRecord.startDate}
-            initialEndDate={selectedRecord.endDate}
-            submitError={editorError}
-            submitLabel="保存修改"
-            onSubmit={handleSaveRecord}
-            onCancel={() => confirmLeaveEditing()}
-          />
-        </View>
+        <PeriodRecordForm
+          key={selectedRecord.id}
+          initialStartDate={selectedRecord.startDate}
+          initialEndDate={selectedRecord.endDate}
+          submitError={editorError}
+          submitLabel="保存修改"
+          onSubmit={handleSaveRecord}
+          onCancel={() => confirmLeaveEditing()}
+        />
       );
     }
 
     const feedbackText = panelError ? (
       <Text style={styles.errorText}>{panelError}</Text>
     ) : panelMessage ? (
-      <Text style={styles.successText}>{panelMessage}</Text>
+      <Text style={styles.panelMessageText}>{panelMessage}</Text>
     ) : null;
 
     if (pendingStartDate && pendingRange) {
       return (
         <View style={styles.markPanel}>
-          <Text style={styles.valueText}>第二步：确认结束日期</Text>
+          <Text style={styles.valueText}>将这一天设为结束日期</Text>
           <Text style={styles.helperText}>
-            当前选中的日期会作为结束日期；如果结束日期早于开始日期，保存时会自动排序。
+            当前已选区间会在保存时自动按时间顺序整理。
           </Text>
           <View style={styles.rangeSummary}>
             <Text style={styles.rangeText}>
@@ -583,7 +594,7 @@ export default function HomeScreen() {
     if (selectedRecord) {
       return (
         <View style={styles.detailContent}>
-          <Text style={styles.valueText}>查看已记录经期</Text>
+          <Text style={styles.valueText}>这一天属于已记录经期</Text>
           <Text style={styles.helperText}>
             当前日期属于 {formatDisplayDate(selectedRecord.startDate)} 至{" "}
             {formatDisplayDate(selectedRecord.endDate)} 的记录。
@@ -615,9 +626,9 @@ export default function HomeScreen() {
 
     return (
       <View style={styles.markPanel}>
-        <Text style={styles.valueText}>第一步：选择开始日期</Text>
+        <Text style={styles.valueText}>将这一天设为开始日期</Text>
         <Text style={styles.helperText}>
-          先在日历中选中想记录的第一天，再把当前日期设为开始日期。
+          选中开始日后，再点另一日期并确认结束，即可保存整段经期。
         </Text>
         <View style={styles.rangeSummary}>
           <Text style={styles.rangeText}>当前选择：{formatDisplayDate(selectedDate)}</Text>
@@ -640,6 +651,26 @@ export default function HomeScreen() {
     visibleMonth.getMonth() + 1
   }月`;
   const selectedDateObject = parseDateKey(selectedDate);
+  const calendarPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        // 只在明显横向滑动时接管手势，避免影响纵向滚动和普通点击。
+        onMoveShouldSetPanResponder: (_, gestureState) =>
+          Math.abs(gestureState.dx) > 12 &&
+          Math.abs(gestureState.dx) > Math.abs(gestureState.dy),
+        onPanResponderRelease: (_, gestureState) => {
+          if (gestureState.dx <= -40) {
+            changeMonth(1);
+            return;
+          }
+
+          if (gestureState.dx >= 40) {
+            changeMonth(-1);
+          }
+        },
+      }),
+    [changeMonth],
+  );
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -648,76 +679,33 @@ export default function HomeScreen() {
         <Text style={styles.subtleText}>今天：{formatDisplayDate(todayKey)}</Text>
       </ScreenSection>
 
-      <View style={styles.summaryGrid}>
-        <SectionCard
-          style={[
-            styles.summaryCard,
-            isTodayInPeriod ? styles.periodStatusCard : styles.normalStatusCard,
-          ]}
-        >
-          <LabelText>今日状态</LabelText>
-          <Text style={styles.statusText}>
-            {isTodayInPeriod ? "处于已记录经期内" : "不在已记录经期内"}
-          </Text>
+      {isLoading ? (
+        <SectionCard>
+          <EmptyText style={styles.cardEmptyText}>加载中...</EmptyText>
         </SectionCard>
+      ) : (
+        renderHeroSummary()
+      )}
 
-        <SectionCard style={styles.summaryCard}>
-          <LabelText>最近记录</LabelText>
-          {isLoading ? (
-            <EmptyText style={styles.cardEmptyText}>加载中...</EmptyText>
-          ) : (
-            renderLatestRecord()
-          )}
-        </SectionCard>
-
-        <SectionCard style={styles.summaryCard}>
-          <LabelText>预计下一次开始日期</LabelText>
-          {isLoading ? (
-            <EmptyText style={styles.cardEmptyText}>加载中...</EmptyText>
-          ) : (
-            renderPrediction()
-          )}
-        </SectionCard>
-      </View>
-
-      <View style={styles.monthHeader}>
-        <Pressable
-          onPress={() => changeMonth(-1)}
-          disabled={isInteractionLocked}
-          style={({ pressed }) => [
-            styles.monthButton,
-            pressed && !isInteractionLocked ? styles.pressedButton : null,
-            isInteractionLocked ? styles.disabledMonthButton : null,
-          ]}
-        >
-          <Text style={styles.monthButtonText}>上个月</Text>
-        </Pressable>
-        <Text style={styles.monthTitle}>{visibleMonthLabel}</Text>
-        <Pressable
-          onPress={() => changeMonth(1)}
-          disabled={isInteractionLocked}
-          style={({ pressed }) => [
-            styles.monthButton,
-            pressed && !isInteractionLocked ? styles.pressedButton : null,
-            isInteractionLocked ? styles.disabledMonthButton : null,
-          ]}
-        >
-          <Text style={styles.monthButtonText}>下个月</Text>
-        </Pressable>
-        <Pressable
-          onPress={goToToday}
-          disabled={isInteractionLocked}
-          style={({ pressed }) => [
-            styles.monthButton,
-            pressed && !isInteractionLocked ? styles.pressedButton : null,
-            isInteractionLocked ? styles.disabledMonthButton : null,
-          ]}
-        >
-          <Text style={styles.monthButtonText}>回今天</Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.calendar}>
+      <View style={styles.calendar} {...calendarPanResponder.panHandlers}>
+        <View style={styles.calendarHeader}>
+          <Text style={styles.monthTitle}>{visibleMonthLabel}</Text>
+          <View style={styles.calendarHeaderAction}>
+            {shouldShowBackToToday ? (
+              <Pressable
+                onPress={goToToday}
+                disabled={isInteractionLocked}
+                style={({ pressed }) => [
+                  styles.backToTodayButton,
+                  pressed && !isInteractionLocked ? styles.pressedButton : null,
+                  isInteractionLocked ? styles.disabledInteractiveItem : null,
+                ]}
+              >
+                <Text style={styles.backToTodayText}>回今天</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
         <View style={styles.weekRow}>
           {WEEK_DAYS.map((weekDay) => (
             <Text key={weekDay} style={styles.weekText}>
@@ -756,83 +744,112 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: fontSizes.md,
   },
-  summaryGrid: {
-    gap: spacing.md,
-  },
-  summaryCard: {
-    borderRadius: radii.lg,
-    gap: spacing.sm,
-  },
-  periodStatusCard: {
-    backgroundColor: colors.roseSurface,
-    borderColor: colors.rose,
-  },
-  normalStatusCard: {
-    backgroundColor: colors.tealSurface,
-    borderColor: colors.teal,
-  },
-  statusText: {
-    color: colors.text,
-    fontSize: 22,
-    fontWeight: "700",
-  },
   valueText: {
     color: colors.text,
     fontSize: fontSizes.xl,
+    fontWeight: "700",
+  },
+  heroCard: {
+    backgroundColor: colors.surfaceSoft,
+    borderColor: colors.border,
+    gap: spacing.md,
+    shadowColor: "#b97b88",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+  },
+  heroHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  heroDate: {
+    color: colors.textMuted,
+    fontSize: fontSizes.md,
+  },
+  heroTitle: {
+    color: colors.text,
+    fontSize: fontSizes.xxl,
+    fontWeight: "700",
+  },
+  heroSubtitle: {
+    color: colors.textMuted,
+    fontSize: fontSizes.lg,
+    lineHeight: 24,
+  },
+  heroMetaGrid: {
+    flexDirection: "row",
+    gap: spacing.md,
+  },
+  heroMetaCard: {
+    backgroundColor: "rgba(255,255,255,0.7)",
+    borderRadius: radii.md,
+    flex: 1,
+    gap: spacing.xs,
+    padding: spacing.md,
+  },
+  heroMetaLabel: {
+    color: colors.textSubtle,
+    fontSize: fontSizes.sm,
     fontWeight: "600",
   },
-  predictionGroup: {
-    gap: spacing.xs,
+  heroMetaValue: {
+    color: colors.text,
+    fontSize: fontSizes.md,
+    fontWeight: "700",
+  },
+  heroFootnote: {
+    color: colors.textSubtle,
+    fontSize: fontSizes.sm,
   },
   helperText: {
     color: colors.textMuted,
-    fontSize: fontSizes.lg,
+    fontSize: fontSizes.md,
+    lineHeight: 22,
   },
   cardEmptyText: {
     textAlign: "left",
   },
-  monthHeader: {
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.md,
-    justifyContent: "space-between",
-    padding: spacing.md,
-  },
-  monthButton: {
-    alignItems: "center",
-    backgroundColor: colors.surfaceMuted,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    minWidth: 76,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  monthButtonText: {
-    color: colors.text,
-    fontSize: fontSizes.md,
-    fontWeight: "600",
-  },
-  monthTitle: {
-    color: colors.text,
-    flex: 1,
-    fontSize: fontSizes.xl,
-    fontWeight: "700",
-    minWidth: 120,
-    textAlign: "center",
-  },
   calendar: {
+    alignItems: "center",
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderRadius: radii.lg,
     borderWidth: 1,
     gap: spacing.sm,
-    padding: spacing.md,
+    padding: spacing.lg,
+  },
+  calendarHeader: {
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 32,
+    position: "relative",
+    width: "100%",
+  },
+  calendarHeaderAction: {
+    alignItems: "flex-end",
+    justifyContent: "center",
+    position: "absolute",
+    right: 0,
+  },
+  monthTitle: {
+    color: colors.text,
+    fontSize: fontSizes.xl,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  backToTodayButton: {
+    backgroundColor: "rgba(255,255,255,0.72)",
+    borderColor: colors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  backToTodayText: {
+    color: colors.textMuted,
+    fontSize: fontSizes.sm,
+    fontWeight: "600",
   },
   weekRow: {
     flexDirection: "row",
@@ -854,28 +871,27 @@ const styles = StyleSheet.create({
     alignItems: "center",
     aspectRatio: 1,
     backgroundColor: colors.surface,
-    borderColor: colors.border,
     borderRadius: radii.md,
-    borderWidth: 1,
     justifyContent: "center",
     minHeight: 42,
     width: "14.2857%",
   },
   otherMonthDay: {
-    backgroundColor: colors.surfaceMuted,
-    borderColor: colors.border,
+    opacity: 0.45,
   },
   periodDay: {
-    backgroundColor: colors.roseSurface,
-    borderColor: colors.rose,
+    backgroundColor: colors.surfaceSoft,
   },
   pendingStartDay: {
-    backgroundColor: colors.tealSurface,
-    borderColor: colors.teal,
+    borderColor: colors.primary,
+    borderWidth: 2,
   },
   selectedDay: {
     backgroundColor: colors.primary,
-    borderColor: colors.primary,
+  },
+  selectedPendingStartDay: {
+    borderColor: colors.onPrimary,
+    borderWidth: 2,
   },
   pressedDay: {
     opacity: 0.72,
@@ -892,7 +908,7 @@ const styles = StyleSheet.create({
     color: colors.rose,
   },
   pendingStartDayText: {
-    color: colors.teal,
+    color: colors.primary,
   },
   selectedDayText: {
     color: colors.onPrimary,
@@ -910,18 +926,19 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   detailSection: {
+    backgroundColor: colors.surfaceSoft,
+    borderColor: colors.border,
     gap: spacing.md,
   },
   detailContent: {
-    gap: spacing.sm,
-  },
-  actionStack: {
     gap: spacing.md,
   },
   label: {
-    color: colors.textMuted,
-    fontSize: fontSizes.lg,
-    fontWeight: "600",
+    color: colors.textSubtle,
+    fontSize: fontSizes.sm,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+    textTransform: "uppercase",
   },
   emptyText: {
     color: colors.textSubtle,
@@ -931,14 +948,17 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   rangeSummary: {
+    backgroundColor: "rgba(255,255,255,0.7)",
+    borderRadius: radii.md,
     gap: spacing.xs,
+    padding: spacing.md,
   },
   rangeText: {
     color: colors.text,
-    fontSize: fontSizes.lg,
+    fontSize: fontSizes.md,
   },
-  successText: {
-    color: colors.teal,
+  panelMessageText: {
+    color: colors.accent,
     fontSize: fontSizes.md,
     fontWeight: "600",
   },
@@ -951,16 +971,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.md,
-    justifyContent: "flex-end",
+    justifyContent: "flex-start",
     marginTop: spacing.xs,
   },
+  actionStack: {
+    gap: spacing.md,
+  },
   actionButton: {
-    minWidth: 88,
+    flexGrow: 1,
   },
   pressedButton: {
     opacity: 0.7,
   },
-  disabledMonthButton: {
+  disabledInteractiveItem: {
     opacity: 0.55,
   },
 });

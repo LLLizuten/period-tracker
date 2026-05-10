@@ -129,51 +129,52 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   labelText: {
-    color: colors.text,
-    fontSize: fontSizes.md,
-    fontWeight: "600",
+    color: colors.textMuted,
+    fontSize: fontSizes.sm,
+    fontWeight: "700",
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
   },
   button: {
     alignItems: "center",
     borderRadius: radii.md,
     justifyContent: "center",
-    minHeight: 44,
+    minHeight: 48,
     minWidth: 88,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
   },
   buttonText: {
     fontSize: fontSizes.lg,
-    fontWeight: "600",
+    fontWeight: "700",
   },
   primaryButton: {
     backgroundColor: colors.primary,
   },
   primaryButtonPressed: {
     backgroundColor: colors.primaryPressed,
-    opacity: 0.86,
   },
   primaryButtonText: {
     color: colors.onPrimary,
   },
   secondaryButton: {
-    backgroundColor: colors.surfaceMuted,
+    backgroundColor: colors.surface,
     borderColor: colors.border,
     borderWidth: 1,
   },
   secondaryButtonPressed: {
-    opacity: 0.72,
+    backgroundColor: colors.surfaceMuted,
   },
   secondaryButtonText: {
     color: colors.text,
   },
   dangerButton: {
     backgroundColor: colors.roseSurface,
-    borderColor: colors.rose,
+    borderColor: colors.roseSurface,
     borderWidth: 1,
   },
   dangerButtonPressed: {
-    opacity: 0.72,
+    opacity: 0.82,
   },
   dangerButtonText: {
     color: colors.rose,

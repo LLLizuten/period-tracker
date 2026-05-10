@@ -201,21 +201,21 @@ export function PeriodRecordForm({
         </View>
 
         <LabelText>
-          正在选择{editingField === "start" ? "开始日期" : "结束日期"}
+          正在调整{editingField === "start" ? "开始日期" : "结束日期"}
         </LabelText>
         <View style={styles.feedbackPanel}>
           <View style={styles.rangePreview}>
-            <Text style={styles.feedbackLabel}>当前记录区间</Text>
+            <Text style={styles.feedbackLabel}>当前经期区间</Text>
             <Text style={styles.rangePreviewText}>
               {formatDisplayDate(sortedDateRange.startDate)} -{" "}
               {formatDisplayDate(sortedDateRange.endDate)}
             </Text>
           </View>
-          <View style={styles.errorMessageBox}>
-            <Text style={styles.errorMessageText}>
-              {submitError ?? " "}
-            </Text>
-          </View>
+          {submitError ? (
+            <View style={styles.errorMessageBox}>
+              <Text style={styles.errorMessageText}>{submitError}</Text>
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.weekRow}>
@@ -282,7 +282,6 @@ function DateFieldButton({
 const styles = StyleSheet.create({
   fieldTabs: {
     flexDirection: "row",
-    flexWrap: "wrap",
     gap: spacing.md,
   },
   fieldButton: {
@@ -292,13 +291,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flex: 1,
     gap: spacing.xs,
-    minWidth: 140,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
+    padding: spacing.md,
   },
   activeFieldButton: {
-    backgroundColor: colors.tealSurface,
-    borderColor: colors.teal,
+    backgroundColor: colors.surfaceSoft,
+    borderColor: colors.primary,
   },
   fieldLabel: {
     color: colors.textMuted,
@@ -311,21 +308,21 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   activeFieldText: {
-    color: colors.teal,
+    color: colors.primary,
   },
   calendarPanel: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: radii.md,
+    borderRadius: radii.lg,
     borderWidth: 1,
     gap: spacing.md,
-    padding: spacing.md,
+    padding: spacing.lg,
   },
   feedbackPanel: {
     gap: spacing.sm,
   },
   rangePreview: {
-    backgroundColor: colors.surfaceMuted,
+    backgroundColor: colors.surfaceSoft,
     borderColor: colors.border,
     borderRadius: radii.md,
     borderWidth: 1,
@@ -344,12 +341,16 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   errorMessageBox: {
-    minHeight: 20,
+    backgroundColor: colors.roseSurface,
+    borderRadius: radii.md,
+    minHeight: 44,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
   errorMessageText: {
     color: colors.rose,
     fontSize: fontSizes.sm,
-    lineHeight: 20,
+    lineHeight: 18,
   },
   monthHeader: {
     alignItems: "center",
@@ -360,7 +361,7 @@ const styles = StyleSheet.create({
   },
   monthButton: {
     alignItems: "center",
-    backgroundColor: colors.surfaceMuted,
+    backgroundColor: colors.surfaceSoft,
     borderColor: colors.border,
     borderRadius: radii.md,
     borderWidth: 1,
@@ -400,7 +401,7 @@ const styles = StyleSheet.create({
   dayCell: {
     alignItems: "center",
     aspectRatio: 1,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceSoft,
     borderColor: colors.border,
     borderRadius: radii.md,
     borderWidth: 1,
@@ -409,12 +410,12 @@ const styles = StyleSheet.create({
     width: "14.2857%",
   },
   otherMonthDay: {
-    backgroundColor: colors.surfaceMuted,
+    backgroundColor: colors.surfaceWarm,
     borderColor: colors.border,
   },
   startDay: {
-    backgroundColor: colors.tealSurface,
-    borderColor: colors.teal,
+    backgroundColor: colors.surfaceWarm,
+    borderColor: colors.primary,
   },
   endDay: {
     backgroundColor: colors.roseSurface,
@@ -445,7 +446,7 @@ const styles = StyleSheet.create({
     color: colors.onPrimary,
   },
   startDayText: {
-    color: colors.teal,
+    color: colors.primary,
   },
   endDayText: {
     color: colors.rose,
