@@ -674,11 +674,6 @@ export default function HomeScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <ScreenSection style={styles.headerSection}>
-        <Text style={styles.title}>首页</Text>
-        <Text style={styles.subtleText}>今天：{formatDisplayDate(todayKey)}</Text>
-      </ScreenSection>
-
       {isLoading ? (
         <SectionCard>
           <EmptyText style={styles.cardEmptyText}>加载中...</EmptyText>
@@ -731,18 +726,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     gap: spacing.xl,
     padding: spacing.xl,
-  },
-  headerSection: {
-    gap: spacing.sm,
-  },
-  title: {
-    color: colors.text,
-    fontSize: 28,
-    fontWeight: "700",
-  },
-  subtleText: {
-    color: colors.textMuted,
-    fontSize: fontSizes.md,
   },
   valueText: {
     color: colors.text,

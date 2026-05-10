@@ -87,7 +87,6 @@ export default function SettingsScreen() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <ScreenSection style={styles.headerSection}>
-        <Text style={styles.title}>设置</Text>
         <Text style={styles.subtleText}>本地数据与隐私</Text>
       </ScreenSection>
 
@@ -126,11 +125,6 @@ const styles = StyleSheet.create({
   },
   headerSection: {
     gap: spacing.sm,
-  },
-  title: {
-    color: colors.text,
-    fontSize: 28,
-    fontWeight: "700",
   },
   subtleText: {
     color: colors.textMuted,
