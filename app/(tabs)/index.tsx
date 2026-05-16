@@ -1,7 +1,6 @@
 import { useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
-  Alert,
   PanResponder,
   Pressable,
   ScrollView,
@@ -14,11 +13,13 @@ import { PeriodRecordForm } from "../../src/components/PeriodRecordForm";
 import {
   DangerButton,
   EmptyText,
+  InlineConfirmPanel,
   LabelText,
   PrimaryButton,
   ScreenSection,
   SecondaryButton,
   SectionCard,
+  StatusMessage,
 } from "../../src/components/ui";
 import {
   createPeriodRecord,
@@ -52,6 +53,14 @@ type RecordInput = {
   endDate: DateKey;
 };
 
+type InlineConfirmation = {
+  title: string;
+  description?: string;
+  confirmLabel: string;
+  cancelLabel: string;
+  onConfirm: () => void;
+};
+
 export default function HomeScreen() {
   const today = new Date();
   const todayKey = toDateKey(today);
@@ -66,6 +75,9 @@ export default function HomeScreen() {
   const [panelMessage, setPanelMessage] = useState<string | null>(null);
   const [panelError, setPanelError] = useState<string | null>(null);
   const [editorError, setEditorError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [inlineConfirmation, setInlineConfirmation] =
+    useState<InlineConfirmation | null>(null);
   const [isSavingMark, setIsSavingMark] = useState(false);
   const [isDeletingRecord, setIsDeletingRecord] = useState(false);
   const isFocusedRef = useRef(false);
@@ -116,11 +128,13 @@ export default function HomeScreen() {
 
         if (isActive()) {
           setRecords(nextRecords);
+          setLoadError(null);
+          setInlineConfirmation(null);
         }
       } catch (error) {
         if (isActive()) {
           const message = error instanceof Error ? error.message : "请稍后重试";
-          Alert.alert("加载失败", message);
+          setLoadError(message);
         }
       } finally {
         if (isActive()) {
@@ -151,39 +165,43 @@ export default function HomeScreen() {
     setPanelError(null);
   }, []);
 
+  const clearInlineConfirmation = useCallback(() => {
+    setInlineConfirmation(null);
+  }, []);
+
   const confirmAbandonPendingRange = useCallback(
     (onConfirm?: () => void) => {
-      Alert.alert("取消本次记录", "确认放弃当前这次经期记录吗？", [
-        { text: "继续选择", style: "cancel" },
-        {
-          text: "放弃记录",
-          style: "destructive",
-          onPress: () => {
-            setPendingStartDate(null);
-            clearPanelFeedback();
-            onConfirm?.();
-          },
+      setInlineConfirmation({
+        title: "取消本次记录",
+        description: "确认放弃当前这次经期记录吗？",
+        confirmLabel: "放弃记录",
+        cancelLabel: "继续选择",
+        onConfirm: () => {
+          setInlineConfirmation(null);
+          setPendingStartDate(null);
+          clearPanelFeedback();
+          onConfirm?.();
         },
-      ]);
+      });
     },
     [clearPanelFeedback],
   );
 
   const confirmLeaveEditing = useCallback(
     (onConfirm?: () => void) => {
-      Alert.alert("放弃本次编辑", "确认放弃当前对这条经期记录的修改吗？", [
-        { text: "继续编辑", style: "cancel" },
-        {
-          text: "放弃修改",
-          style: "destructive",
-          onPress: () => {
-            setIsEditing(false);
-            setEditorError(null);
-            clearPanelFeedback();
-            onConfirm?.();
-          },
+      setInlineConfirmation({
+        title: "放弃本次编辑",
+        description: "确认放弃当前对这条经期记录的修改吗？",
+        confirmLabel: "放弃修改",
+        cancelLabel: "继续编辑",
+        onConfirm: () => {
+          setInlineConfirmation(null);
+          setIsEditing(false);
+          setEditorError(null);
+          clearPanelFeedback();
+          onConfirm?.();
         },
-      ]);
+      });
     },
     [clearPanelFeedback],
   );
@@ -205,11 +223,13 @@ export default function HomeScreen() {
       }
 
       clearPanelFeedback();
+      clearInlineConfirmation();
       setEditorError(null);
       nextAction();
     },
     [
       clearPanelFeedback,
+      clearInlineConfirmation,
       confirmAbandonPendingRange,
       confirmLeaveEditing,
       isEditing,
@@ -277,6 +297,7 @@ export default function HomeScreen() {
 
       // 新增第二步点击普通日期时继续选择结束日期；只有切去查看已有记录时才确认放弃。
       if (!targetRecord) {
+        clearInlineConfirmation();
         setSelectedDate(dateKey);
         return;
       }
@@ -288,18 +309,21 @@ export default function HomeScreen() {
     }
 
     clearPanelFeedback();
+    clearInlineConfirmation();
     setEditorError(null);
     setSelectedDate(dateKey);
   };
 
   const handleStartRecord = () => {
     clearPanelFeedback();
+    clearInlineConfirmation();
     setEditorError(null);
     setPendingStartDate(selectedDate);
   };
 
   const handleResetPendingStartDate = () => {
     clearPanelFeedback();
+    clearInlineConfirmation();
     setPendingStartDate(selectedDate);
   };
 
@@ -320,6 +344,7 @@ export default function HomeScreen() {
 
     setPanelError(null);
     setPanelMessage(null);
+    clearInlineConfirmation();
     setIsSavingMark(true);
     try {
       await initPeriodDatabase();
@@ -361,6 +386,7 @@ export default function HomeScreen() {
     setEditorError(null);
     setPanelError(null);
     setPanelMessage(null);
+    clearInlineConfirmation();
     setIsSavingMark(true);
     try {
       await initPeriodDatabase();
@@ -391,16 +417,18 @@ export default function HomeScreen() {
       return;
     }
 
-    Alert.alert("删除记录", "确认删除这条经期记录吗？", [
-      { text: "取消", style: "cancel" },
-      {
-        text: "删除",
-        style: "destructive",
-        onPress: () => {
-          void deleteSelectedRecord(selectedRecord.id);
-        },
+    const recordId = selectedRecord.id;
+
+    setInlineConfirmation({
+      title: "删除记录",
+      description: "确认删除这条经期记录吗？",
+      confirmLabel: "删除",
+      cancelLabel: "取消",
+      onConfirm: () => {
+        setInlineConfirmation(null);
+        void deleteSelectedRecord(recordId);
       },
-    ]);
+    });
   };
 
   const deleteSelectedRecord = async (recordId: number) => {
@@ -411,6 +439,7 @@ export default function HomeScreen() {
     setIsDeletingRecord(true);
     setPanelError(null);
     setPanelMessage(null);
+    clearInlineConfirmation();
     try {
       await initPeriodDatabase();
       await deletePeriodRecord(recordId);
@@ -535,24 +564,39 @@ export default function HomeScreen() {
       return <Text style={styles.emptyText}>加载中...</Text>;
     }
 
+    const confirmPanel = inlineConfirmation ? (
+      <InlineConfirmPanel
+        title={inlineConfirmation.title}
+        description={inlineConfirmation.description}
+        confirmLabel={inlineConfirmation.confirmLabel}
+        cancelLabel={inlineConfirmation.cancelLabel}
+        disabled={isInteractionLocked}
+        onConfirm={inlineConfirmation.onConfirm}
+        onCancel={clearInlineConfirmation}
+      />
+    ) : null;
+
     if (isEditing && selectedRecord) {
       return (
-        <PeriodRecordForm
-          key={selectedRecord.id}
-          initialStartDate={selectedRecord.startDate}
-          initialEndDate={selectedRecord.endDate}
-          submitError={editorError}
-          submitLabel="保存修改"
-          onSubmit={handleSaveRecord}
-          onCancel={() => confirmLeaveEditing()}
-        />
+        <View style={styles.markPanel}>
+          <PeriodRecordForm
+            key={selectedRecord.id}
+            initialStartDate={selectedRecord.startDate}
+            initialEndDate={selectedRecord.endDate}
+            submitError={editorError}
+            submitLabel="保存修改"
+            onSubmit={handleSaveRecord}
+            onCancel={() => confirmLeaveEditing()}
+          />
+          {confirmPanel}
+        </View>
       );
     }
 
     const feedbackText = panelError ? (
-      <Text style={styles.errorText}>{panelError}</Text>
+      <StatusMessage tone="error">{panelError}</StatusMessage>
     ) : panelMessage ? (
-      <Text style={styles.panelMessageText}>{panelMessage}</Text>
+      <StatusMessage tone="success">{panelMessage}</StatusMessage>
     ) : null;
 
     if (pendingStartDate && pendingRange) {
@@ -572,7 +616,7 @@ export default function HomeScreen() {
               {formatDisplayDate(pendingRange.endDate)}
             </Text>
             {pendingOverlapMessage ? (
-              <Text style={styles.errorText}>{pendingOverlapMessage}</Text>
+              <StatusMessage tone="error">{pendingOverlapMessage}</StatusMessage>
             ) : null}
             {feedbackText}
           </View>
@@ -601,6 +645,7 @@ export default function HomeScreen() {
               </SecondaryButton>
             </View>
           </View>
+          {confirmPanel}
         </View>
       );
     }
@@ -614,10 +659,12 @@ export default function HomeScreen() {
             {formatDisplayDate(selectedRecord.endDate)} 的记录。
           </Text>
           {feedbackText}
+          {confirmPanel}
           <View style={styles.actions}>
             <PrimaryButton
               onPress={() => {
                 clearPanelFeedback();
+                clearInlineConfirmation();
                 setEditorError(null);
                 setIsEditing(true);
               }}
@@ -657,6 +704,7 @@ export default function HomeScreen() {
             设为开始日期
           </PrimaryButton>
         </View>
+        {confirmPanel}
       </View>
     );
   };
@@ -691,6 +739,10 @@ export default function HomeScreen() {
       {isLoading ? (
         <SectionCard>
           <EmptyText style={styles.cardEmptyText}>加载中...</EmptyText>
+        </SectionCard>
+      ) : loadError ? (
+        <SectionCard>
+          <StatusMessage tone="error">加载失败：{loadError}</StatusMessage>
         </SectionCard>
       ) : (
         renderHeroSummary()

@@ -1,12 +1,14 @@
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
-import { Alert, ScrollView, StyleSheet, Text } from "react-native";
+import { ScrollView, StyleSheet, Text } from "react-native";
 
 import {
   DangerButton,
+  InlineConfirmPanel,
   LabelText,
   ScreenSection,
   SectionCard,
+  StatusMessage,
 } from "../../src/components/ui";
 import {
   clearPeriodRecords,
@@ -19,6 +21,12 @@ export default function SettingsScreen() {
   const [recordCount, setRecordCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isClearing, setIsClearing] = useState(false);
+  const [isConfirmingClear, setIsConfirmingClear] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const [statusMessage, setStatusMessage] = useState<{
+    text: string;
+    tone: "success" | "error";
+  } | null>(null);
 
   const loadRecordCount = useCallback(async (isActive: () => boolean = () => true) => {
     try {
@@ -28,11 +36,12 @@ export default function SettingsScreen() {
 
       if (isActive()) {
         setRecordCount(records.length);
+        setLoadError("");
       }
     } catch (error) {
       if (isActive()) {
         const message = error instanceof Error ? error.message : "请稍后重试";
-        Alert.alert("加载失败", message);
+        setLoadError(`加载失败：${message}`);
       }
     } finally {
       if (isActive()) {
@@ -54,35 +63,42 @@ export default function SettingsScreen() {
     }, [loadRecordCount]),
   );
 
+  const isClearDisabled = isLoading || isClearing || recordCount === 0;
+
   const handleClearRecords = () => {
-    Alert.alert("清空所有记录", "确认清空本机保存的全部经期记录吗？", [
-      { text: "取消", style: "cancel" },
-      {
-        text: "清空",
-        style: "destructive",
-        onPress: () => {
-          void clearAllRecords();
-        },
-      },
-    ]);
+    if (isClearDisabled) {
+      return;
+    }
+
+    setStatusMessage(null);
+    setIsConfirmingClear(true);
   };
 
   const clearAllRecords = async () => {
+    if (isClearDisabled) {
+      return;
+    }
+
     try {
       setIsClearing(true);
       // 清空前再次初始化表结构，保证首次进入设置页也能执行重置操作。
       await initPeriodDatabase();
       await clearPeriodRecords();
       setRecordCount(0);
-      Alert.alert("清空成功", "本机经期记录已全部清空。");
+      setIsConfirmingClear(false);
+      setStatusMessage({
+        text: "清空成功，本机经期记录已全部清空。",
+        tone: "success",
+      });
     } catch {
-      Alert.alert("清空失败", "请稍后重试");
+      setStatusMessage({
+        text: "清空失败，请稍后重试。",
+        tone: "error",
+      });
     } finally {
       setIsClearing(false);
     }
   };
-
-  const isClearDisabled = isLoading || isClearing || recordCount === 0;
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -101,17 +117,40 @@ export default function SettingsScreen() {
         <SectionCard style={styles.infoCard}>
           <LabelText>当前本地记录</LabelText>
         <Text style={styles.countText}>{isLoading ? "加载中..." : `${recordCount} 条`}</Text>
+        {loadError ? (
+          <StatusMessage tone="error">{loadError}</StatusMessage>
+        ) : null}
         </SectionCard>
       </ScreenSection>
 
       <SectionCard style={styles.dangerCard}>
         <LabelText style={styles.dangerTitle}>数据操作</LabelText>
-        <DangerButton
-          onPress={handleClearRecords}
-          disabled={isClearDisabled}
-        >
-          {isClearing ? "清空中..." : "清空所有记录"}
-        </DangerButton>
+        {isConfirmingClear ? (
+          <InlineConfirmPanel
+            title="清空所有记录"
+            description="确认清空本机保存的全部经期记录吗？"
+            confirmLabel={isClearing ? "清空中..." : "确认清空"}
+            cancelLabel="取消"
+            confirmTone="danger"
+            disabled={isClearDisabled}
+            onConfirm={() => {
+              void clearAllRecords();
+            }}
+            onCancel={() => {
+              setIsConfirmingClear(false);
+            }}
+          />
+        ) : (
+          <DangerButton
+            onPress={handleClearRecords}
+            disabled={isClearDisabled}
+          >
+            {isClearing ? "清空中..." : "清空所有记录"}
+          </DangerButton>
+        )}
+        {statusMessage ? (
+          <StatusMessage tone={statusMessage.tone}>{statusMessage.text}</StatusMessage>
+        ) : null}
       </SectionCard>
     </ScrollView>
   );

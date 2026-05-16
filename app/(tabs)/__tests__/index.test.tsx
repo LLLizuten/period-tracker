@@ -1,8 +1,10 @@
 import { act, create } from "react-test-renderer";
-import { StyleSheet } from "react-native";
+import { Alert, Modal, StyleSheet } from "react-native";
+import type { ReactTestInstance } from "react-test-renderer";
 
 import HomeScreen from "../index";
 import { colors } from "../../../src/theme";
+import { listPeriodRecords } from "../../../src/db/periodRecords";
 
 type FlattenedStyle = {
   backgroundColor?: string;
@@ -10,10 +12,17 @@ type FlattenedStyle = {
   overflow?: string;
 };
 
+type RendererRoot = ReactTestInstance & {
+  findByType: (type: unknown) => ReactTestInstance;
+};
+
+let mockLatestFocusEffect: (() => void | (() => void)) | null = null;
+
 jest.mock("expo-router", () => ({
   useFocusEffect: (callback: () => void) => {
     const React = require("react");
 
+    mockLatestFocusEffect = callback;
     React.useEffect(() => callback(), [callback]);
   },
 }));
@@ -36,6 +45,10 @@ describe("HomeScreen", () => {
 
   afterAll(() => {
     jest.useRealTimers();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   test("经期区间日历单元保留底层区间带和独立日期内容块", async () => {
@@ -164,5 +177,183 @@ describe("HomeScreen", () => {
         overflow: "hidden",
       }),
     );
+  });
+
+  test("点击删除后以应用内弹窗显示确认且不调用原生 Alert", async () => {
+    const alertSpy = jest.spyOn(Alert, "alert");
+    let renderer: ReturnType<typeof create>;
+
+    await act(async () => {
+      renderer = create(<HomeScreen />);
+    });
+
+    const getTextContent = (node: { children?: unknown[] | string | number | null }) => {
+      const { children } = node;
+
+      if (Array.isArray(children)) {
+        return children
+          .map((child) => (typeof child === "string" || typeof child === "number" ? String(child) : ""))
+          .join("");
+      }
+
+      return children;
+    };
+
+    const findPressableAncestor = (node: ReactTestInstance) => {
+      let current = node.parent;
+
+      while (current) {
+        if (typeof current.props?.onPress === "function") {
+          return current;
+        }
+
+        current = current.parent;
+      }
+
+      return null;
+    };
+
+    const recordDay = renderer!.root.find(
+      (node) =>
+        node.type === "Text" &&
+        getTextContent(node) === "4" &&
+        (StyleSheet.flatten(node.props.style) as FlattenedStyle | undefined)
+          ?.color === colors.rose,
+    );
+
+    await act(async () => {
+      const onPress = findPressableAncestor(recordDay)?.props.onPress;
+
+      if (typeof onPress === "function") {
+        onPress();
+      }
+    });
+
+    const deleteButtonText = renderer!.root.find(
+      (node) => node.type === "Text" && getTextContent(node) === "删除",
+    );
+
+    await act(async () => {
+      const onPress = findPressableAncestor(deleteButtonText)?.props.onPress;
+
+      if (typeof onPress === "function") {
+        onPress();
+      }
+    });
+
+    const confirmModal = (renderer!.root as RendererRoot).findByType(Modal);
+
+    expect(confirmModal.props.visible).toBe(true);
+    expect(
+      renderer!.root.find(
+        (node) =>
+          node.type === "Text" &&
+          getTextContent(node) === "确认删除这条经期记录吗？",
+      ),
+    ).toBeDefined();
+    expect(alertSpy).not.toHaveBeenCalled();
+  });
+
+  test("记录成功刷新后清理旧删除确认", async () => {
+    const mockedListPeriodRecords = jest.mocked(listPeriodRecords);
+    mockedListPeriodRecords
+      .mockResolvedValueOnce([
+        {
+          id: 1,
+          startDate: "2026-05-04",
+          endDate: "2026-05-09",
+          createdAt: "2026-05-04T00:00:00.000Z",
+          updatedAt: "2026-05-04T00:00:00.000Z",
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: 2,
+          startDate: "2026-05-10",
+          endDate: "2026-05-12",
+          createdAt: "2026-05-10T00:00:00.000Z",
+          updatedAt: "2026-05-10T00:00:00.000Z",
+        },
+      ]);
+
+    let renderer: ReturnType<typeof create>;
+
+    await act(async () => {
+      renderer = create(<HomeScreen />);
+    });
+
+    const getTextContent = (node: { children?: unknown[] | string | number | null }) => {
+      const { children } = node;
+
+      if (Array.isArray(children)) {
+        return children
+          .map((child) => (typeof child === "string" || typeof child === "number" ? String(child) : ""))
+          .join("");
+      }
+
+      return children;
+    };
+
+    const findPressableAncestor = (node: ReactTestInstance) => {
+      let current = node.parent;
+
+      while (current) {
+        if (typeof current.props?.onPress === "function") {
+          return current;
+        }
+
+        current = current.parent;
+      }
+
+      return null;
+    };
+
+    const recordDay = renderer!.root.find(
+      (node) =>
+        node.type === "Text" &&
+        getTextContent(node) === "4" &&
+        (StyleSheet.flatten(node.props.style) as FlattenedStyle | undefined)
+          ?.color === colors.rose,
+    );
+
+    await act(async () => {
+      const onPress = findPressableAncestor(recordDay)?.props.onPress;
+
+      if (typeof onPress === "function") {
+        onPress();
+      }
+    });
+
+    const deleteButtonText = renderer!.root.find(
+      (node) => node.type === "Text" && getTextContent(node) === "删除",
+    );
+
+    await act(async () => {
+      const onPress = findPressableAncestor(deleteButtonText)?.props.onPress;
+
+      if (typeof onPress === "function") {
+        onPress();
+      }
+    });
+
+    expect(
+      renderer!.root.find(
+        (node) =>
+          node.type === "Text" &&
+          getTextContent(node) === "确认删除这条经期记录吗？",
+      ),
+    ).toBeDefined();
+
+    await act(async () => {
+      mockLatestFocusEffect?.();
+    });
+
+    expect(() =>
+      renderer!.root.find(
+        (node) =>
+          node.type === "Text" &&
+          getTextContent(node) === "确认删除这条经期记录吗？",
+      ),
+    ).toThrow();
   });
 });

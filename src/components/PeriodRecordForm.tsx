@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { colors, fontSizes, radii, spacing } from "../theme";
 import type { DateKey } from "../types/period";
@@ -48,6 +48,7 @@ export function PeriodRecordForm({
     return new Date(initialDate.getFullYear(), initialDate.getMonth(), 1, 12);
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [localSubmitError, setLocalSubmitError] = useState<string | null>(null);
   const isSubmittingRef = useRef(false);
 
   const monthDays = useMemo(
@@ -62,6 +63,7 @@ export function PeriodRecordForm({
   const visibleMonthLabel = `${visibleMonth.getFullYear()}年${
     visibleMonth.getMonth() + 1
   }月`;
+  const visibleSubmitError = localSubmitError ?? submitError ?? null;
 
   const changeMonth = (offset: number) => {
     setVisibleMonth(
@@ -73,6 +75,7 @@ export function PeriodRecordForm({
   const focusDateField = (field: EditingField, dateKey: DateKey) => {
     const nextVisibleDate = parseDateKey(dateKey);
 
+    setLocalSubmitError(null);
     setEditingField(field);
     setVisibleMonth(
       new Date(nextVisibleDate.getFullYear(), nextVisibleDate.getMonth(), 1, 12),
@@ -84,6 +87,7 @@ export function PeriodRecordForm({
       return;
     }
 
+    setLocalSubmitError(null);
     // 当前编辑哪个字段，就把日历选中日期写入对应字段。
     if (editingField === "start") {
       setStartDate(dateKey);
@@ -102,6 +106,7 @@ export function PeriodRecordForm({
 
     isSubmittingRef.current = true;
     setIsSubmitting(true);
+    setLocalSubmitError(null);
     try {
       // 提交前统一使用有序区间，兼容用户任意选择开始和结束日期的顺序。
       await onSubmit({
@@ -110,7 +115,7 @@ export function PeriodRecordForm({
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "请稍后重试";
-      Alert.alert("保存失败", message);
+      setLocalSubmitError(message);
     } finally {
       isSubmittingRef.current = false;
       setIsSubmitting(false);
@@ -211,9 +216,9 @@ export function PeriodRecordForm({
               {formatDisplayDate(sortedDateRange.endDate)}
             </Text>
           </View>
-          {submitError ? (
+          {visibleSubmitError ? (
             <View style={styles.errorMessageBox}>
-              <Text style={styles.errorMessageText}>{submitError}</Text>
+              <Text style={styles.errorMessageText}>{visibleSubmitError}</Text>
             </View>
           ) : null}
         </View>
