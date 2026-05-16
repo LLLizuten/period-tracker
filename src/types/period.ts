@@ -13,3 +13,7 @@ export interface PeriodPrediction {
   cycleLength: number;
   basedOnRecordCount: number;
 }
+
+export interface PredictionSettings {
+  cycleLengthDays: number | null;
+}

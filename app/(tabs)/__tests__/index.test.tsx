@@ -5,6 +5,7 @@ import type { ReactTestInstance } from "react-test-renderer";
 import HomeScreen from "../index";
 import { colors } from "../../../src/theme";
 import { listPeriodRecords } from "../../../src/db/periodRecords";
+import { getPredictionSettings } from "../../../src/db/predictionSettings";
 
 type FlattenedStyle = {
   backgroundColor?: string;
@@ -14,6 +15,7 @@ type FlattenedStyle = {
 
 type RendererRoot = ReactTestInstance & {
   findByType: (type: unknown) => ReactTestInstance;
+  findByProps: (props: Record<string, unknown>) => ReactTestInstance;
 };
 
 let mockLatestFocusEffect: (() => void | (() => void)) | null = null;
@@ -37,6 +39,11 @@ jest.mock("../../../src/db/periodRecords", () => ({
   deletePeriodRecord: jest.fn(),
 }));
 
+jest.mock("../../../src/db/predictionSettings", () => ({
+  getPredictionSettings: jest.fn().mockResolvedValue({ cycleLengthDays: null }),
+  initPredictionSettingsDatabase: jest.fn().mockResolvedValue(undefined),
+}));
+
 describe("HomeScreen", () => {
   beforeAll(() => {
     jest.useFakeTimers();
@@ -49,6 +56,27 @@ describe("HomeScreen", () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+  });
+
+  test("首页使用固定周期设置预测下一次开始日期", async () => {
+    jest.mocked(getPredictionSettings).mockResolvedValue({ cycleLengthDays: 30 });
+    jest.mocked(listPeriodRecords).mockResolvedValue([
+      {
+        id: 1,
+        startDate: "2026-05-04",
+        endDate: "2026-05-09",
+        createdAt: "2026-05-04T00:00:00.000Z",
+        updatedAt: "2026-05-04T00:00:00.000Z",
+      },
+    ]);
+
+    let renderer: ReturnType<typeof create>;
+
+    await act(async () => {
+      renderer = create(<HomeScreen />);
+    });
+
+    expect((renderer!.root as RendererRoot).findByProps({ children: "2026年6月3日" })).toBeDefined();
   });
 
   test("经期区间日历单元保留底层区间带和独立日期内容块", async () => {

@@ -3,6 +3,12 @@ import { act, create, type ReactTestInstance } from "react-test-renderer";
 
 import SettingsScreen from "../settings";
 import {
+  clearCycleLengthDays,
+  getPredictionSettings,
+  initPredictionSettingsDatabase,
+  saveCycleLengthDays,
+} from "../../../src/db/predictionSettings";
+import {
   clearPeriodRecords,
   initPeriodDatabase,
   listPeriodRecords,
@@ -22,14 +28,29 @@ jest.mock("../../../src/db/periodRecords", () => ({
   listPeriodRecords: jest.fn(),
 }));
 
+jest.mock("../../../src/db/predictionSettings", () => ({
+  clearCycleLengthDays: jest.fn().mockResolvedValue(undefined),
+  getPredictionSettings: jest.fn(),
+  initPredictionSettingsDatabase: jest.fn().mockResolvedValue(undefined),
+  saveCycleLengthDays: jest.fn().mockResolvedValue(undefined),
+}));
+
 type PressableTestProps = {
   onPress?: () => void;
+};
+
+type TextInputTestProps = {
+  onChangeText: (text: string) => void;
 };
 
 const mockAlert = jest.spyOn(Alert, "alert").mockImplementation(jest.fn());
 const mockInitPeriodDatabase = jest.mocked(initPeriodDatabase);
 const mockListPeriodRecords = jest.mocked(listPeriodRecords);
 const mockClearPeriodRecords = jest.mocked(clearPeriodRecords);
+const mockInitPredictionSettingsDatabase = jest.mocked(initPredictionSettingsDatabase);
+const mockGetPredictionSettings = jest.mocked(getPredictionSettings);
+const mockSaveCycleLengthDays = jest.mocked(saveCycleLengthDays);
+const mockClearCycleLengthDays = jest.mocked(clearCycleLengthDays);
 
 type TestNode = ReactTestInstance & {
   find: (predicate: (node: TestNode) => boolean) => TestNode;
@@ -56,6 +77,14 @@ function findAllTextByChildren(root: TestNode, children: string) {
   return root.findAllByType("Text").filter((textNode) => textNode.props.children === children);
 }
 
+function findTextInputByPlaceholder(root: TestNode, placeholder: string) {
+  return root.find(
+    (node) =>
+      node.type === "TextInput" &&
+      node.props.placeholder === placeholder,
+  ) as TestNode & { props: TextInputTestProps };
+}
+
 async function renderSettingsScreen() {
   let renderer: ReturnType<typeof create>;
 
@@ -80,6 +109,159 @@ describe("SettingsScreen", () => {
       },
     ]);
     mockClearPeriodRecords.mockResolvedValue(undefined);
+    mockInitPredictionSettingsDatabase.mockClear();
+    mockGetPredictionSettings.mockReset();
+    mockSaveCycleLengthDays.mockClear();
+    mockClearCycleLengthDays.mockClear();
+    mockInitPredictionSettingsDatabase.mockResolvedValue(undefined);
+    mockGetPredictionSettings.mockResolvedValue({ cycleLengthDays: null });
+    mockSaveCycleLengthDays.mockResolvedValue(undefined);
+    mockClearCycleLengthDays.mockResolvedValue(undefined);
+  });
+
+  test("默认展示智能预测设置并在加载时初始化预测设置表", async () => {
+    const renderer = await renderSettingsScreen();
+    const root = renderer.root as TestNode;
+
+    expect(mockInitPeriodDatabase).toHaveBeenCalled();
+    expect(mockInitPredictionSettingsDatabase).toHaveBeenCalled();
+    expect(mockListPeriodRecords).toHaveBeenCalled();
+    expect(mockGetPredictionSettings).toHaveBeenCalled();
+    expect(root.findByProps({ children: "经期预测设置" })).toBeDefined();
+    expect(root.findByProps({ children: "智能预测" })).toBeDefined();
+    expect(
+      root.findByProps({
+        children: "未设置周期长度时，将根据历史记录自动估算。",
+      }),
+    ).toBeDefined();
+    expect(findTextInputByPlaceholder(root, "21-35")).toBeDefined();
+    expect(mockAlert).not.toHaveBeenCalled();
+  });
+
+  test("保存合法固定周期后更新设置状态并展示成功消息", async () => {
+    const renderer = await renderSettingsScreen();
+    mockInitPredictionSettingsDatabase.mockClear();
+
+    await act(async () => {
+      const input = findTextInputByPlaceholder(renderer.root as TestNode, "21-35");
+
+      input.props.onChangeText("30");
+    });
+
+    await act(async () => {
+      const saveButton = findPressableByText(renderer.root as TestNode, "保存周期");
+
+      (saveButton.props as PressableTestProps).onPress?.();
+    });
+
+    const root = renderer.root as TestNode;
+
+    expect(mockInitPredictionSettingsDatabase).toHaveBeenCalledTimes(1);
+    expect(mockInitPredictionSettingsDatabase.mock.invocationCallOrder[0]).toBeLessThan(
+      mockSaveCycleLengthDays.mock.invocationCallOrder[0],
+    );
+    expect(mockSaveCycleLengthDays).toHaveBeenCalledWith(30);
+    expect(root.findByProps({ children: "固定周期：30 天" })).toBeDefined();
+    expect(root.findByProps({ children: "周期设置已保存。" })).toBeDefined();
+    expect(mockAlert).not.toHaveBeenCalled();
+  });
+
+  test("保存固定周期失败时展示页内错误", async () => {
+    mockSaveCycleLengthDays.mockRejectedValue(new Error("保存失败"));
+    const renderer = await renderSettingsScreen();
+    mockInitPredictionSettingsDatabase.mockClear();
+
+    await act(async () => {
+      const input = findTextInputByPlaceholder(renderer.root as TestNode, "21-35");
+
+      input.props.onChangeText("30");
+    });
+
+    await act(async () => {
+      const saveButton = findPressableByText(renderer.root as TestNode, "保存周期");
+
+      (saveButton.props as PressableTestProps).onPress?.();
+    });
+
+    const root = renderer.root as TestNode;
+
+    expect(mockInitPredictionSettingsDatabase).toHaveBeenCalledTimes(1);
+    expect(mockInitPredictionSettingsDatabase.mock.invocationCallOrder[0]).toBeLessThan(
+      mockSaveCycleLengthDays.mock.invocationCallOrder[0],
+    );
+    expect(root.findByProps({ children: "保存失败，请稍后重试。" })).toBeDefined();
+    expect(mockAlert).not.toHaveBeenCalled();
+  });
+
+  test("非法周期输入展示页内错误且不保存", async () => {
+    const renderer = await renderSettingsScreen();
+
+    await act(async () => {
+      const input = findTextInputByPlaceholder(renderer.root as TestNode, "21-35");
+
+      input.props.onChangeText("20");
+    });
+
+    await act(async () => {
+      const saveButton = findPressableByText(renderer.root as TestNode, "保存周期");
+
+      (saveButton.props as PressableTestProps).onPress?.();
+    });
+
+    expect(mockSaveCycleLengthDays).not.toHaveBeenCalled();
+    expect(
+      (renderer.root as TestNode).findByProps({
+        children: "周期长度需为 21-35 天的整数。",
+      }),
+    ).toBeDefined();
+    expect(mockAlert).not.toHaveBeenCalled();
+  });
+
+  test("清空固定周期后恢复智能预测并清空输入", async () => {
+    mockGetPredictionSettings.mockResolvedValue({ cycleLengthDays: 28 });
+    const renderer = await renderSettingsScreen();
+    mockInitPredictionSettingsDatabase.mockClear();
+
+    await act(async () => {
+      const clearButton = findPressableByText(renderer.root as TestNode, "使用智能预测");
+
+      (clearButton.props as PressableTestProps).onPress?.();
+    });
+
+    const root = renderer.root as TestNode;
+    const input = findTextInputByPlaceholder(root, "21-35");
+
+    expect(mockInitPredictionSettingsDatabase).toHaveBeenCalledTimes(1);
+    expect(mockInitPredictionSettingsDatabase.mock.invocationCallOrder[0]).toBeLessThan(
+      mockClearCycleLengthDays.mock.invocationCallOrder[0],
+    );
+    expect(mockClearCycleLengthDays).toHaveBeenCalled();
+    expect(root.findByProps({ children: "智能预测" })).toBeDefined();
+    expect(root.findByProps({ children: "已恢复智能预测。" })).toBeDefined();
+    expect(input.props.value).toBe("");
+    expect(mockAlert).not.toHaveBeenCalled();
+  });
+
+  test("恢复智能预测失败时展示页内错误", async () => {
+    mockGetPredictionSettings.mockResolvedValue({ cycleLengthDays: 28 });
+    mockClearCycleLengthDays.mockRejectedValue(new Error("恢复失败"));
+    const renderer = await renderSettingsScreen();
+    mockInitPredictionSettingsDatabase.mockClear();
+
+    await act(async () => {
+      const clearButton = findPressableByText(renderer.root as TestNode, "使用智能预测");
+
+      (clearButton.props as PressableTestProps).onPress?.();
+    });
+
+    const root = renderer.root as TestNode;
+
+    expect(mockInitPredictionSettingsDatabase).toHaveBeenCalledTimes(1);
+    expect(mockInitPredictionSettingsDatabase.mock.invocationCallOrder[0]).toBeLessThan(
+      mockClearCycleLengthDays.mock.invocationCallOrder[0],
+    );
+    expect(root.findByProps({ children: "恢复失败，请稍后重试。" })).toBeDefined();
+    expect(mockAlert).not.toHaveBeenCalled();
   });
 
   test("点击清空所有记录后以应用内弹窗展示确认文案，不调用原生 Alert", async () => {

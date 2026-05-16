@@ -1,15 +1,23 @@
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
-import { ScrollView, StyleSheet, Text } from "react-native";
+import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import {
   DangerButton,
   InlineConfirmPanel,
   LabelText,
+  PrimaryButton,
   ScreenSection,
+  SecondaryButton,
   SectionCard,
   StatusMessage,
 } from "../../src/components/ui";
+import {
+  clearCycleLengthDays,
+  getPredictionSettings,
+  initPredictionSettingsDatabase,
+  saveCycleLengthDays,
+} from "../../src/db/predictionSettings";
 import {
   clearPeriodRecords,
   initPeriodDatabase,
@@ -23,19 +31,33 @@ export default function SettingsScreen() {
   const [isClearing, setIsClearing] = useState(false);
   const [isConfirmingClear, setIsConfirmingClear] = useState(false);
   const [loadError, setLoadError] = useState("");
+  const [cycleLengthDays, setCycleLengthDays] = useState<number | null>(null);
+  const [cycleLengthInput, setCycleLengthInput] = useState("");
+  const [predictionStatusMessage, setPredictionStatusMessage] = useState<{
+    text: string;
+    tone: "success" | "error";
+  } | null>(null);
   const [statusMessage, setStatusMessage] = useState<{
     text: string;
     tone: "success" | "error";
   } | null>(null);
 
-  const loadRecordCount = useCallback(async (isActive: () => boolean = () => true) => {
+  const loadSettings = useCallback(async (isActive: () => boolean = () => true) => {
     try {
-      // 进入页面时先确保本地表存在，再读取记录数量用于展示当前状态。
+      // 进入页面时先确保本地表存在，再读取记录数量和预测设置用于展示当前状态。
       await initPeriodDatabase();
+      await initPredictionSettingsDatabase();
       const records = await listPeriodRecords();
+      const predictionSettings = await getPredictionSettings();
 
       if (isActive()) {
         setRecordCount(records.length);
+        setCycleLengthDays(predictionSettings.cycleLengthDays);
+        setCycleLengthInput(
+          predictionSettings.cycleLengthDays === null
+            ? ""
+            : String(predictionSettings.cycleLengthDays),
+        );
         setLoadError("");
       }
     } catch (error) {
@@ -55,15 +77,66 @@ export default function SettingsScreen() {
       let isActive = true;
 
       setIsLoading(true);
-      void loadRecordCount(() => isActive);
+      void loadSettings(() => isActive);
 
       return () => {
         isActive = false;
       };
-    }, [loadRecordCount]),
+    }, [loadSettings]),
   );
 
   const isClearDisabled = isLoading || isClearing || recordCount === 0;
+
+  const handleSaveCycleLength = async () => {
+    const parsedCycleLength = Number(cycleLengthInput);
+
+    if (
+      cycleLengthInput.trim() === "" ||
+      !Number.isInteger(parsedCycleLength) ||
+      parsedCycleLength < 21 ||
+      parsedCycleLength > 35
+    ) {
+      setPredictionStatusMessage({
+        text: "周期长度需为 21-35 天的整数。",
+        tone: "error",
+      });
+      return;
+    }
+
+    try {
+      await initPredictionSettingsDatabase();
+      await saveCycleLengthDays(parsedCycleLength);
+      setCycleLengthDays(parsedCycleLength);
+      setCycleLengthInput(String(parsedCycleLength));
+      setPredictionStatusMessage({
+        text: "周期设置已保存。",
+        tone: "success",
+      });
+    } catch {
+      setPredictionStatusMessage({
+        text: "保存失败，请稍后重试。",
+        tone: "error",
+      });
+    }
+  };
+
+  const handleClearCycleLength = async () => {
+    try {
+      await initPredictionSettingsDatabase();
+      await clearCycleLengthDays();
+      setCycleLengthDays(null);
+      setCycleLengthInput("");
+      setPredictionStatusMessage({
+        text: "已恢复智能预测。",
+        tone: "success",
+      });
+    } catch {
+      setPredictionStatusMessage({
+        text: "恢复失败，请稍后重试。",
+        tone: "error",
+      });
+    }
+  };
 
   const handleClearRecords = () => {
     if (isClearDisabled) {
@@ -123,6 +196,44 @@ export default function SettingsScreen() {
         </SectionCard>
       </ScreenSection>
 
+      <SectionCard style={styles.infoCard}>
+        <LabelText>经期预测设置</LabelText>
+        <Text style={styles.countText}>
+          {cycleLengthDays === null ? "智能预测" : `固定周期：${cycleLengthDays} 天`}
+        </Text>
+        <Text style={styles.bodyText}>未设置周期长度时，将根据历史记录自动估算。</Text>
+        <TextInput
+          value={cycleLengthInput}
+          onChangeText={setCycleLengthInput}
+          placeholder="21-35"
+          keyboardType="number-pad"
+          style={styles.input}
+        />
+        <View style={styles.predictionActions}>
+          <PrimaryButton
+            onPress={() => {
+              void handleSaveCycleLength();
+            }}
+            style={styles.predictionActionButton}
+          >
+            保存周期
+          </PrimaryButton>
+          <SecondaryButton
+            onPress={() => {
+              void handleClearCycleLength();
+            }}
+            style={styles.predictionActionButton}
+          >
+            使用智能预测
+          </SecondaryButton>
+        </View>
+        {predictionStatusMessage ? (
+          <StatusMessage tone={predictionStatusMessage.tone}>
+            {predictionStatusMessage.text}
+          </StatusMessage>
+        ) : null}
+      </SectionCard>
+
       <SectionCard style={styles.dangerCard}>
         <LabelText style={styles.dangerTitle}>数据操作</LabelText>
         {isConfirmingClear ? (
@@ -181,6 +292,24 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 22,
     fontWeight: "700",
+  },
+  input: {
+    backgroundColor: colors.background,
+    borderColor: colors.border,
+    borderRadius: 12,
+    borderWidth: 1,
+    color: colors.text,
+    fontSize: fontSizes.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  predictionActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.md,
+  },
+  predictionActionButton: {
+    flexGrow: 1,
   },
   dangerCard: {
     backgroundColor: colors.roseSurface,

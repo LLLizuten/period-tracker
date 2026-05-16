@@ -28,8 +28,12 @@ import {
   listPeriodRecords,
   updatePeriodRecord,
 } from "../../src/db/periodRecords";
+import {
+  getPredictionSettings,
+  initPredictionSettingsDatabase,
+} from "../../src/db/predictionSettings";
 import { colors, fontSizes, radii, spacing } from "../../src/theme";
-import type { DateKey, PeriodRecord } from "../../src/types/period";
+import type { DateKey, PeriodRecord, PredictionSettings } from "../../src/types/period";
 import {
   getPeriodRangePosition,
   getRecordForDate,
@@ -65,6 +69,9 @@ export default function HomeScreen() {
   const today = new Date();
   const todayKey = toDateKey(today);
   const [records, setRecords] = useState<PeriodRecord[]>([]);
+  const [predictionSettings, setPredictionSettings] = useState<PredictionSettings>({
+    cycleLengthDays: null,
+  });
   const [selectedDate, setSelectedDate] = useState<DateKey>(todayKey);
   const [visibleMonth, setVisibleMonth] = useState(
     () => new Date(today.getFullYear(), today.getMonth(), 1, 12),
@@ -87,7 +94,10 @@ export default function HomeScreen() {
     [visibleMonth],
   );
   const latestRecord = useMemo(() => getLatestRecord(records), [records]);
-  const prediction = useMemo(() => predictNextPeriod(records), [records]);
+  const prediction = useMemo(
+    () => predictNextPeriod(records, predictionSettings),
+    [predictionSettings, records],
+  );
   const selectedRecord = useMemo(
     () => getRecordForDate(records, selectedDate),
     [records, selectedDate],
@@ -124,9 +134,12 @@ export default function HomeScreen() {
       try {
         // 页面聚焦时先确保本地表存在，再读取最新记录，避免冷启动读表失败。
         await initPeriodDatabase();
+        await initPredictionSettingsDatabase();
+        const nextPredictionSettings = await getPredictionSettings();
         const nextRecords = await listPeriodRecords();
 
         if (isActive()) {
+          setPredictionSettings(nextPredictionSettings);
           setRecords(nextRecords);
           setLoadError(null);
           setInlineConfirmation(null);

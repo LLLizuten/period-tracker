@@ -1,4 +1,4 @@
-import type { PeriodPrediction, PeriodRecord } from "../types/period";
+import type { PeriodPrediction, PeriodRecord, PredictionSettings } from "../types/period";
 import { addDays, daysBetween } from "./date";
 
 const DEFAULT_CYCLE_LENGTH = 28;
@@ -19,11 +19,22 @@ export function getLatestRecord(records: PeriodRecord[]): PeriodRecord | null {
 }
 
 // 根据历史开始日期间隔预测下一次经期开始日期。
-export function predictNextPeriod(records: PeriodRecord[]): PeriodPrediction | null {
+export function predictNextPeriod(
+  records: PeriodRecord[],
+  settings?: PredictionSettings,
+): PeriodPrediction | null {
   const latestRecord = getLatestRecord(records);
 
   if (latestRecord === null) {
     return null;
+  }
+
+  if (typeof settings?.cycleLengthDays === "number") {
+    return {
+      nextStartDate: addDays(latestRecord.startDate, settings.cycleLengthDays),
+      cycleLength: settings.cycleLengthDays,
+      basedOnRecordCount: records.length,
+    };
   }
 
   if (records.length === 1) {
