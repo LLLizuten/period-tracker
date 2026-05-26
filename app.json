@@ -13,6 +13,15 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "8e248b7c-0ca8-4da8-91d4-432356970b50"
+      }
+    },
+    "android": {
+      "package": "com.lllizuten.periodtracker"
     }
   }
 }
