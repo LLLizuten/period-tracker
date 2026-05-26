@@ -23,6 +23,10 @@ import {
   initPeriodDatabase,
   listPeriodRecords,
 } from "../../src/db/periodRecords";
+import {
+  exportDatabase,
+  importDatabaseFromPicker,
+} from "../../src/utils/backup";
 import { colors, fontSizes, spacing } from "../../src/theme";
 
 export default function SettingsScreen() {
@@ -38,6 +42,12 @@ export default function SettingsScreen() {
     tone: "success" | "error";
   } | null>(null);
   const [statusMessage, setStatusMessage] = useState<{
+    text: string;
+    tone: "success" | "error";
+  } | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [backupStatusMessage, setBackupStatusMessage] = useState<{
     text: string;
     tone: "success" | "error";
   } | null>(null);
@@ -147,6 +157,39 @@ export default function SettingsScreen() {
     setIsConfirmingClear(true);
   };
 
+  const handleExport = async () => {
+    setIsExporting(true);
+    setBackupStatusMessage(null);
+    try {
+      await exportDatabase();
+      // 导出后重新加载数据，确保页面状态与数据库一致。
+      await loadSettings();
+      setBackupStatusMessage({ text: "备份导出成功，请妥善保管文件。", tone: "success" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "请稍后重试";
+      setBackupStatusMessage({ text: `导出失败：${message}`, tone: "error" });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleImport = async () => {
+    setIsImporting(true);
+    setBackupStatusMessage(null);
+    try {
+      await importDatabaseFromPicker();
+      await loadSettings();
+      setBackupStatusMessage({ text: "数据恢复成功。", tone: "success" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "请稍后重试";
+      if (message !== "User canceled") {
+        setBackupStatusMessage({ text: `恢复失败：${message}`, tone: "error" });
+      }
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   const clearAllRecords = async () => {
     if (isClearDisabled) {
       return;
@@ -230,6 +273,38 @@ export default function SettingsScreen() {
         {predictionStatusMessage ? (
           <StatusMessage tone={predictionStatusMessage.tone}>
             {predictionStatusMessage.text}
+          </StatusMessage>
+        ) : null}
+      </SectionCard>
+
+      <SectionCard style={styles.infoCard}>
+        <LabelText>备份与恢复</LabelText>
+        <Text style={styles.bodyText}>
+          将数据导出为文件，或从之前导出的备份文件恢复数据。
+        </Text>
+        <View style={styles.predictionActions}>
+          <PrimaryButton
+            onPress={() => {
+              void handleExport();
+            }}
+            disabled={isExporting || isImporting}
+            style={styles.predictionActionButton}
+          >
+            {isExporting ? "导出中..." : "导出备份"}
+          </PrimaryButton>
+          <SecondaryButton
+            onPress={() => {
+              void handleImport();
+            }}
+            disabled={isExporting || isImporting}
+            style={styles.predictionActionButton}
+          >
+            {isImporting ? "恢复中..." : "恢复备份"}
+          </SecondaryButton>
+        </View>
+        {backupStatusMessage ? (
+          <StatusMessage tone={backupStatusMessage.tone}>
+            {backupStatusMessage.text}
           </StatusMessage>
         ) : null}
       </SectionCard>

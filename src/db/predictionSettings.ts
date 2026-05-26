@@ -11,9 +11,14 @@ type SettingRow = {
 };
 
 let databasePromise: Promise<SQLite.SQLiteDatabase> | null = null;
+let databaseInstance: SQLite.SQLiteDatabase | null = null;
 
 function getDatabase(): Promise<SQLite.SQLiteDatabase> {
-  databasePromise ??= SQLite.openDatabaseAsync(DATABASE_NAME);
+  databasePromise ??= SQLite.openDatabaseAsync(DATABASE_NAME).then((db) => {
+    databaseInstance = db;
+
+    return db;
+  });
 
   return databasePromise;
 }
@@ -52,6 +57,15 @@ export async function saveCycleLengthDays(cycleLengthDays: number): Promise<void
     CYCLE_LENGTH_KEY,
     String(cycleLengthDays),
   );
+}
+
+// 关闭数据库连接并重置内部状态，供备份/恢复模块在文件操作前使用。
+export async function closePredictionSettingsDatabase(): Promise<void> {
+  if (databaseInstance) {
+    await databaseInstance.closeAsync();
+    databaseInstance = null;
+    databasePromise = null;
+  }
 }
 
 // 删除自定义周期长度，恢复智能预测。

@@ -19,6 +19,7 @@ type PeriodRecordInput = {
 };
 
 let databasePromise: Promise<SQLite.SQLiteDatabase> | null = null;
+let databaseInstance: SQLite.SQLiteDatabase | null = null;
 
 function getTodayDateKey(): DateKey {
   const date = new Date();
@@ -30,7 +31,11 @@ function getTodayDateKey(): DateKey {
 }
 
 function getDatabase(): Promise<SQLite.SQLiteDatabase> {
-  databasePromise ??= SQLite.openDatabaseAsync(DATABASE_NAME);
+  databasePromise ??= SQLite.openDatabaseAsync(DATABASE_NAME).then((db) => {
+    databaseInstance = db;
+
+    return db;
+  });
 
   return databasePromise;
 }
@@ -151,6 +156,15 @@ export async function deletePeriodRecord(id: number): Promise<void> {
   const database = await getDatabase();
 
   await database.runAsync(`DELETE FROM ${TABLE_NAME} WHERE id = ?`, id);
+}
+
+// 关闭数据库连接并重置内部状态，供备份/恢复模块在文件操作前使用。
+export async function closePeriodDatabase(): Promise<void> {
+  if (databaseInstance) {
+    await databaseInstance.closeAsync();
+    databaseInstance = null;
+    databasePromise = null;
+  }
 }
 
 // 清空全部本地经期记录，用于重置本地数据。

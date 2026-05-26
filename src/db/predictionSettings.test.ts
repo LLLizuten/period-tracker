@@ -12,7 +12,7 @@ import {
 const mockExecAsync = jest.fn();
 const mockGetFirstAsync = jest.fn();
 const mockRunAsync = jest.fn();
-const mockOpenDatabaseAsync = jest.fn(() => ({
+const mockOpenDatabaseAsync = jest.fn(() => Promise.resolve({
   execAsync: mockExecAsync,
   getFirstAsync: mockGetFirstAsync,
   runAsync: mockRunAsync,
