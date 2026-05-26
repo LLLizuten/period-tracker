@@ -78,7 +78,6 @@ export default function HomeScreen() {
   );
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
-  const [pendingStartDate, setPendingStartDate] = useState<DateKey | null>(null);
   const [panelMessage, setPanelMessage] = useState<string | null>(null);
   const [panelError, setPanelError] = useState<string | null>(null);
   const [editorError, setEditorError] = useState<string | null>(null);
@@ -102,18 +101,7 @@ export default function HomeScreen() {
     () => getRecordForDate(records, selectedDate),
     [records, selectedDate],
   );
-  // 新增流程始终基于当前起止日期生成有序区间，避免选择顺序影响最终结果。
-  const pendingRange = useMemo(
-    () => (pendingStartDate ? sortDateRange(pendingStartDate, selectedDate) : null),
-    [pendingStartDate, selectedDate],
-  );
-  const pendingOverlapMessage = useMemo(() => {
-    if (!pendingRange || !hasOverlappingRecord(records, pendingRange)) {
-      return null;
-    }
 
-    return "当前选择的日期范围与已有经期记录重叠，请重新选择。";
-  }, [pendingRange, records]);
   const isTodayInPeriod = useMemo(
     () => isPeriodDate(records, todayKey),
     [records, todayKey],
@@ -182,24 +170,6 @@ export default function HomeScreen() {
     setInlineConfirmation(null);
   }, []);
 
-  const confirmAbandonPendingRange = useCallback(
-    (onConfirm?: () => void) => {
-      setInlineConfirmation({
-        title: "取消本次记录",
-        description: "确认放弃当前这次经期记录吗？",
-        confirmLabel: "放弃记录",
-        cancelLabel: "继续选择",
-        onConfirm: () => {
-          setInlineConfirmation(null);
-          setPendingStartDate(null);
-          clearPanelFeedback();
-          onConfirm?.();
-        },
-      });
-    },
-    [clearPanelFeedback],
-  );
-
   const confirmLeaveEditing = useCallback(
     (onConfirm?: () => void) => {
       setInlineConfirmation({
@@ -225,11 +195,6 @@ export default function HomeScreen() {
         return;
       }
 
-      if (pendingStartDate) {
-        confirmAbandonPendingRange(nextAction);
-        return;
-      }
-
       if (isEditing) {
         confirmLeaveEditing(nextAction);
         return;
@@ -243,25 +208,15 @@ export default function HomeScreen() {
     [
       clearPanelFeedback,
       clearInlineConfirmation,
-      confirmAbandonPendingRange,
       confirmLeaveEditing,
       isEditing,
       isInteractionLocked,
-      pendingStartDate,
     ],
   );
 
   const changeMonth = useCallback(
     (offset: number) => {
       if (isInteractionLocked) {
-        return;
-      }
-
-      if (pendingStartDate && !isEditing) {
-        setVisibleMonth(
-          (currentMonth) =>
-            new Date(currentMonth.getFullYear(), currentMonth.getMonth() + offset, 1, 12),
-        );
         return;
       }
 
@@ -272,17 +227,11 @@ export default function HomeScreen() {
         );
       });
     },
-    [isEditing, isInteractionLocked, pendingStartDate, runWithInterruptConfirmation],
+    [isInteractionLocked, runWithInterruptConfirmation],
   );
 
   const goToToday = () => {
     if (isInteractionLocked) {
-      return;
-    }
-
-    if (pendingStartDate && !isEditing) {
-      setVisibleMonth(new Date(today.getFullYear(), today.getMonth(), 1, 12));
-      setSelectedDate(todayKey);
       return;
     }
 
@@ -305,53 +254,14 @@ export default function HomeScreen() {
       return;
     }
 
-    if (pendingStartDate) {
-      const targetRecord = getRecordForDate(records, dateKey);
-
-      // 新增第二步点击普通日期时继续选择结束日期；只有切去查看已有记录时才确认放弃。
-      if (!targetRecord) {
-        clearInlineConfirmation();
-        setSelectedDate(dateKey);
-        return;
-      }
-
-      confirmAbandonPendingRange(() => {
-        setSelectedDate(dateKey);
-      });
-      return;
-    }
-
     clearPanelFeedback();
     clearInlineConfirmation();
     setEditorError(null);
     setSelectedDate(dateKey);
   };
 
-  const handleStartRecord = () => {
-    clearPanelFeedback();
-    clearInlineConfirmation();
-    setEditorError(null);
-    setPendingStartDate(selectedDate);
-  };
-
-  const handleResetPendingStartDate = () => {
-    clearPanelFeedback();
-    clearInlineConfirmation();
-    setPendingStartDate(selectedDate);
-  };
-
-  const handleCancelRecordRange = () => {
-    confirmAbandonPendingRange();
-  };
-
-  const handleSaveRecordRange = async () => {
-    if (isInteractionLocked || !pendingRange) {
-      return;
-    }
-
-    if (pendingOverlapMessage) {
-      setPanelError(pendingOverlapMessage);
-      setPanelMessage(null);
+  const handleStartRecord = async () => {
+    if (isInteractionLocked) {
       return;
     }
 
@@ -361,14 +271,16 @@ export default function HomeScreen() {
     setIsSavingMark(true);
     try {
       await initPeriodDatabase();
-      await createPeriodRecord(pendingRange);
-      setPendingStartDate(null);
+      // 设为开始日期时立即保存为单日记录，持久化到数据库。
+      // 几天后可点该日期 → 编辑 → 延长结束日期。
+      await createPeriodRecord({
+        startDate: selectedDate,
+        endDate: selectedDate,
+      });
       await loadRecords();
       if (isFocusedRef.current) {
         setPanelMessage(
-          `已记录 ${formatDisplayDate(pendingRange.startDate)} 至 ${formatDisplayDate(
-            pendingRange.endDate,
-          )}。`,
+          `已记录 ${formatDisplayDate(selectedDate)} 为经期开始日。`,
         );
       }
     } catch (error) {
@@ -520,7 +432,6 @@ export default function HomeScreen() {
     const periodRangePosition = getPeriodRangePosition(records, day.dateKey);
     const isSelected = day.dateKey === selectedDate;
     const isMarked = isPeriodDate(records, day.dateKey);
-    const isPendingStart = day.dateKey === pendingStartDate;
     const isSingleDayPeriod =
       periodRangePosition?.isStart === true && periodRangePosition?.isEnd === true;
 
@@ -549,9 +460,7 @@ export default function HomeScreen() {
           <View
             style={[
               styles.dayContent,
-              isPendingStart && styles.pendingStartDay,
               isSelected && styles.selectedDay,
-              isSelected && isPendingStart ? styles.selectedPendingStartDay : null,
             ]}
           >
             <Text
@@ -559,7 +468,6 @@ export default function HomeScreen() {
                 styles.dayText,
                 !day.isCurrentMonth && styles.otherMonthText,
                 dayRecord && styles.periodDayText,
-                isPendingStart && styles.pendingStartDayText,
                 isSelected && styles.selectedDayText,
               ]}
               numberOfLines={1}
@@ -612,57 +520,6 @@ export default function HomeScreen() {
       <StatusMessage tone="success">{panelMessage}</StatusMessage>
     ) : null;
 
-    if (pendingStartDate && pendingRange) {
-      return (
-        <View style={styles.markPanel}>
-          <Text style={styles.valueText}>将这一天设为结束日期</Text>
-          <Text style={styles.helperText}>
-            当前已选区间会在保存时自动按时间顺序整理。
-          </Text>
-          <View style={styles.rangeSummary}>
-            <Text style={styles.rangeText}>
-              开始日期：{formatDisplayDate(pendingStartDate)}
-            </Text>
-            <Text style={styles.rangeText}>结束日期：{formatDisplayDate(selectedDate)}</Text>
-            <Text style={styles.helperText}>
-              即将保存：{formatDisplayDate(pendingRange.startDate)} 至{" "}
-              {formatDisplayDate(pendingRange.endDate)}
-            </Text>
-            {pendingOverlapMessage ? (
-              <StatusMessage tone="error">{pendingOverlapMessage}</StatusMessage>
-            ) : null}
-            {feedbackText}
-          </View>
-          <View style={styles.actionStack}>
-            <PrimaryButton
-              onPress={handleSaveRecordRange}
-              disabled={isInteractionLocked}
-              style={styles.actionButton}
-            >
-              {isSavingMark ? "保存中..." : "设为结束日期"}
-            </PrimaryButton>
-            <View style={styles.actions}>
-              <SecondaryButton
-                onPress={handleResetPendingStartDate}
-                disabled={isInteractionLocked}
-                style={styles.actionButton}
-              >
-                重新选开始日期
-              </SecondaryButton>
-              <SecondaryButton
-                onPress={handleCancelRecordRange}
-                disabled={isInteractionLocked}
-                style={styles.actionButton}
-              >
-                取消本次记录
-              </SecondaryButton>
-            </View>
-          </View>
-          {confirmPanel}
-        </View>
-      );
-    }
-
     if (selectedRecord) {
       return (
         <View style={styles.detailContent}>
@@ -702,7 +559,7 @@ export default function HomeScreen() {
       <View style={styles.markPanel}>
         <Text style={styles.valueText}>将这一天设为开始日期</Text>
         <Text style={styles.helperText}>
-          选中开始日后，再点另一日期并确认结束，即可保存整段经期。
+          设为开始日期后立即保存为单日记录。几天后可点击该日期 → 编辑 → 延长结束日期。
         </Text>
         <View style={styles.rangeSummary}>
           <Text style={styles.rangeText}>当前选择：{formatDisplayDate(selectedDate)}</Text>
@@ -980,16 +837,8 @@ const styles = StyleSheet.create({
     maxWidth: 42,
     width: "100%",
   },
-  pendingStartDay: {
-    borderColor: colors.primary,
-    borderWidth: 2,
-  },
   selectedDay: {
     backgroundColor: colors.primary,
-  },
-  selectedPendingStartDay: {
-    borderColor: colors.onPrimary,
-    borderWidth: 2,
   },
   pressedDay: {
     opacity: 0.72,
@@ -1004,9 +853,6 @@ const styles = StyleSheet.create({
   },
   periodDayText: {
     color: colors.rose,
-  },
-  pendingStartDayText: {
-    color: colors.primary,
   },
   selectedDayText: {
     color: colors.onPrimary,
@@ -1059,9 +905,6 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     justifyContent: "flex-start",
     marginTop: spacing.xs,
-  },
-  actionStack: {
-    gap: spacing.md,
   },
   actionButton: {
     flexGrow: 1,
