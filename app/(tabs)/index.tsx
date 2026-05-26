@@ -101,6 +101,13 @@ export default function HomeScreen() {
     () => getRecordForDate(records, selectedDate),
     [records, selectedDate],
   );
+  // 查找选中日之前最近的单日记录（start===end），用于判断是否展示「设为结束日期」按钮。
+  const pendingStartRecord = useMemo(() => {
+    const candidates = records
+      .filter((r) => r.startDate === r.endDate && r.startDate < selectedDate)
+      .sort((a, b) => b.startDate.localeCompare(a.startDate));
+    return candidates.length > 0 ? candidates[0] : null;
+  }, [records, selectedDate]);
 
   const isTodayInPeriod = useMemo(
     () => isPeriodDate(records, todayKey),
@@ -271,8 +278,7 @@ export default function HomeScreen() {
     setIsSavingMark(true);
     try {
       await initPeriodDatabase();
-      // 设为开始日期时立即保存为单日记录，持久化到数据库。
-      // 几天后可点该日期 → 编辑 → 延长结束日期。
+      // 设为开始日期时立即保存单日记录，后续可点另一日期设为结束日期自动关联。
       await createPeriodRecord({
         startDate: selectedDate,
         endDate: selectedDate,
@@ -281,6 +287,45 @@ export default function HomeScreen() {
       if (isFocusedRef.current) {
         setPanelMessage(
           `已记录 ${formatDisplayDate(selectedDate)} 为经期开始日。`,
+        );
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "请稍后重试";
+      if (isFocusedRef.current) {
+        setPanelError(message);
+        setPanelMessage(null);
+      }
+    } finally {
+      if (isFocusedRef.current) {
+        setIsSavingMark(false);
+      }
+    }
+  };
+
+  // 将选中日设为已有单日记录的结束日期，自动关联成经期区间。
+  const handleEndRecord = async () => {
+    if (isInteractionLocked || !pendingStartRecord) {
+      return;
+    }
+
+    const startDate = pendingStartRecord.startDate < selectedDate
+      ? pendingStartRecord.startDate
+      : selectedDate;
+    const endDate = pendingStartRecord.startDate < selectedDate
+      ? selectedDate
+      : pendingStartRecord.startDate;
+
+    setPanelError(null);
+    setPanelMessage(null);
+    clearInlineConfirmation();
+    setIsSavingMark(true);
+    try {
+      await initPeriodDatabase();
+      await updatePeriodRecord(pendingStartRecord.id, { startDate, endDate });
+      await loadRecords();
+      if (isFocusedRef.current) {
+        setPanelMessage(
+          `已记录 ${formatDisplayDate(startDate)} 至 ${formatDisplayDate(endDate)}。`,
         );
       }
     } catch (error) {
@@ -555,11 +600,40 @@ export default function HomeScreen() {
       );
     }
 
+    // 已有单日记录在前 → 显示「设为结束日期」
+    if (pendingStartRecord) {
+      return (
+        <View style={styles.markPanel}>
+          <Text style={styles.valueText}>将这一天设为结束日期</Text>
+          <Text style={styles.helperText}>
+            开始日期：{formatDisplayDate(pendingStartRecord.startDate)}
+          </Text>
+          <View style={styles.rangeSummary}>
+            <Text style={styles.rangeText}>
+              周期：{formatDisplayDate(pendingStartRecord.startDate)} 至{" "}
+              {formatDisplayDate(selectedDate)}
+            </Text>
+            {feedbackText}
+          </View>
+          <View style={styles.actions}>
+            <PrimaryButton
+              onPress={handleEndRecord}
+              disabled={isLoading || isInteractionLocked}
+              style={styles.actionButton}
+            >
+              设为结束日期
+            </PrimaryButton>
+          </View>
+          {confirmPanel}
+        </View>
+      );
+    }
+
     return (
       <View style={styles.markPanel}>
         <Text style={styles.valueText}>将这一天设为开始日期</Text>
         <Text style={styles.helperText}>
-          设为开始日期后立即保存为单日记录。几天后可点击该日期 → 编辑 → 延长结束日期。
+          设为后即可点另一日期设为结束日期，自动关联为经期周期。
         </Text>
         <View style={styles.rangeSummary}>
           <Text style={styles.rangeText}>当前选择：{formatDisplayDate(selectedDate)}</Text>
