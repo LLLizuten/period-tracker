@@ -20,7 +20,6 @@ import {
   SecondaryButton,
   SectionCard,
   StatusMessage,
-  Toast,
 } from "../../src/components/ui";
 import {
   createPeriodRecord,
@@ -81,10 +80,6 @@ export default function HomeScreen() {
   const [isEditing, setIsEditing] = useState(false);
   const [panelMessage, setPanelMessage] = useState<string | null>(null);
   const [panelError, setPanelError] = useState<string | null>(null);
-  const [toastState, setToastState] = useState<{
-    text: string;
-    tone: "success" | "error";
-  } | null>(null);
   const [editorError, setEditorError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [inlineConfirmation, setInlineConfirmation] =
@@ -284,15 +279,14 @@ export default function HomeScreen() {
       });
       await loadRecords();
       if (isFocusedRef.current) {
-        const msg = `已记录 ${formatDisplayDate(selectedDate)} 为经期开始日。`;
-        setPanelMessage(msg);
-        setToastState({ text: msg, tone: "success" });
+        setPanelMessage(
+          `已记录 ${formatDisplayDate(selectedDate)} 为经期开始日。`,
+        );
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "请稍后重试";
       if (isFocusedRef.current) {
         setPanelError(message);
-        setToastState({ text: message, tone: "error" });
         setPanelMessage(null);
       }
     } finally {
@@ -325,11 +319,11 @@ export default function HomeScreen() {
       await loadRecords();
       if (isFocusedRef.current) {
         setIsEditing(false);
-        const msg = `已更新为 ${formatDisplayDate(nextRange.startDate)} 至 ${formatDisplayDate(
-          nextRange.endDate,
-        )}。`;
-        setPanelMessage(msg);
-        setToastState({ text: msg, tone: "success" });
+        setPanelMessage(
+          `已更新为 ${formatDisplayDate(nextRange.startDate)} 至 ${formatDisplayDate(
+            nextRange.endDate,
+          )}。`,
+        );
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "请稍后重试";
@@ -379,13 +373,11 @@ export default function HomeScreen() {
         setIsEditing(false);
         setEditorError(null);
         setPanelMessage("已删除这条经期记录。");
-        setToastState({ text: "已删除这条经期记录。", tone: "success" });
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "请稍后重试";
       if (isFocusedRef.current) {
         setPanelError(message);
-        setToastState({ text: message, tone: "error" });
       }
     } finally {
       if (isFocusedRef.current) {
@@ -522,6 +514,12 @@ export default function HomeScreen() {
       );
     }
 
+    const feedbackText = panelError ? (
+      <StatusMessage tone="error">{panelError}</StatusMessage>
+    ) : panelMessage ? (
+      <StatusMessage tone="success">{panelMessage}</StatusMessage>
+    ) : null;
+
     if (selectedRecord) {
       return (
         <View style={styles.detailContent}>
@@ -530,6 +528,7 @@ export default function HomeScreen() {
             当前日期属于 {formatDisplayDate(selectedRecord.startDate)} 至{" "}
             {formatDisplayDate(selectedRecord.endDate)} 的记录。
           </Text>
+          {feedbackText}
           {confirmPanel}
           <View style={styles.actions}>
             <PrimaryButton
@@ -564,6 +563,7 @@ export default function HomeScreen() {
         </Text>
         <View style={styles.rangeSummary}>
           <Text style={styles.rangeText}>当前选择：{formatDisplayDate(selectedDate)}</Text>
+          {feedbackText}
         </View>
         <View style={styles.actions}>
           <PrimaryButton
@@ -605,8 +605,7 @@ export default function HomeScreen() {
   );
 
   return (
-    <View style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView contentContainerStyle={styles.container}>
       {isLoading ? (
         <SectionCard>
           <EmptyText style={styles.cardEmptyText}>加载中...</EmptyText>
@@ -655,15 +654,6 @@ export default function HomeScreen() {
         {renderSelectedDetail()}
       </SectionCard>
     </ScrollView>
-      {toastState && (
-        <Toast
-          key={toastState.text}
-          message={toastState.text}
-          tone={toastState.tone}
-          onDismiss={() => setToastState(null)}
-        />
-      )}
-    </View>
   );
 }
 
