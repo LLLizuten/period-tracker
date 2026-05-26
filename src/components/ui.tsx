@@ -1,5 +1,6 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import {
+  Animated,
   Modal,
   Pressable,
   StyleSheet,
@@ -39,6 +40,12 @@ interface InlineConfirmPanelProps {
   onConfirm: () => void;
   onCancel: () => void;
   style?: StyleProp<ViewStyle>;
+}
+
+interface ToastProps {
+  message: string;
+  tone: "success" | "error";
+  onDismiss: () => void;
 }
 
 interface ButtonProps {
@@ -89,6 +96,46 @@ export function StatusMessage({
         {children}
       </Text>
     </View>
+  );
+}
+
+// 悬浮提示条 — 从底部滑入，自动消失，用于操作成功/失败反馈。
+export function Toast({ message, tone, onDismiss }: ToastProps) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(60)).current;
+
+  useEffect(() => {
+    // 滑入 + 淡入
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 250, useNativeDriver: true }),
+      Animated.timing(translateY, { toValue: 0, duration: 250, useNativeDriver: true }),
+    ]).start();
+
+    // 自动消失（成功 3s，错误 4s）
+    const duration = tone === "error" ? 4000 : 3000;
+    const timer = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(opacity, { toValue: 0, duration: 250, useNativeDriver: true }),
+        Animated.timing(translateY, { toValue: 60, duration: 250, useNativeDriver: true }),
+      ]).start(() => onDismiss());
+    }, duration);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [opacity, translateY, tone, onDismiss]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.toast,
+        tone === "success" ? styles.toastSuccess : styles.toastError,
+        { opacity, transform: [{ translateY }] },
+      ]}
+    >
+      <Text style={styles.toastIcon}>{tone === "success" ? "✓" : "✗"}</Text>
+      <Text style={styles.toastText}>{message}</Text>
+    </Animated.View>
   );
 }
 
@@ -342,6 +389,41 @@ const styles = StyleSheet.create({
   },
   dangerButtonText: {
     color: colors.rose,
+  },
+  toast: {
+    position: "absolute",
+    bottom: 40,
+    left: spacing.xl,
+    right: spacing.xl,
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: radii.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    elevation: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    zIndex: 999,
+  },
+  toastSuccess: {
+    backgroundColor: colors.primary,
+  },
+  toastError: {
+    backgroundColor: colors.rose,
+  },
+  toastIcon: {
+    color: colors.onPrimary,
+    fontSize: fontSizes.lg,
+    fontWeight: "700",
+    marginRight: spacing.sm,
+  },
+  toastText: {
+    color: colors.onPrimary,
+    flex: 1,
+    fontSize: fontSizes.lg,
+    lineHeight: 22,
   },
   disabledButton: {
     opacity: 0.55,

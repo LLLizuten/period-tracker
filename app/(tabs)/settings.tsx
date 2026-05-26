@@ -11,6 +11,7 @@ import {
   SecondaryButton,
   SectionCard,
   StatusMessage,
+  Toast,
 } from "../../src/components/ui";
 import {
   clearCycleLengthDays,
@@ -38,20 +39,12 @@ export default function SettingsScreen() {
   const [cycleLengthDays, setCycleLengthDays] = useState<number | null>(null);
   const [cycleLengthInput, setCycleLengthInput] = useState("");
   const [isIntelligentMode, setIsIntelligentMode] = useState(true);
-  const [predictionStatusMessage, setPredictionStatusMessage] = useState<{
-    text: string;
-    tone: "success" | "error";
-  } | null>(null);
-  const [statusMessage, setStatusMessage] = useState<{
+  const [toastState, setToastState] = useState<{
     text: string;
     tone: "success" | "error";
   } | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
-  const [backupStatusMessage, setBackupStatusMessage] = useState<{
-    text: string;
-    tone: "success" | "error";
-  } | null>(null);
 
   const loadSettings = useCallback(async (isActive: () => boolean = () => true) => {
     try {
@@ -108,7 +101,7 @@ export default function SettingsScreen() {
       parsedCycleLength < 21 ||
       parsedCycleLength > 35
     ) {
-      setPredictionStatusMessage({
+      setToastState({
         text: "周期长度需为 21-35 天的整数。",
         tone: "error",
       });
@@ -120,12 +113,12 @@ export default function SettingsScreen() {
       await saveCycleLengthDays(parsedCycleLength);
       setCycleLengthDays(parsedCycleLength);
       setCycleLengthInput(String(parsedCycleLength));
-      setPredictionStatusMessage({
+      setToastState({
         text: "周期设置已保存。",
         tone: "success",
       });
     } catch {
-      setPredictionStatusMessage({
+      setToastState({
         text: "保存失败，请稍后重试。",
         tone: "error",
       });
@@ -136,19 +129,18 @@ export default function SettingsScreen() {
     if (newValue === true) {
       // 切换到智能预测 → 清除固定周期数据
       if (isIntelligentMode) return;
-      setPredictionStatusMessage(null);
       try {
         await initPredictionSettingsDatabase();
         await clearCycleLengthDays();
         setCycleLengthDays(null);
         setCycleLengthInput("");
         setIsIntelligentMode(true);
-        setPredictionStatusMessage({
+        setToastState({
           text: "已切换为智能预测模式。",
           tone: "success",
         });
       } catch {
-        setPredictionStatusMessage({
+        setToastState({
           text: "切换失败，请稍后重试。",
           tone: "error",
         });
@@ -158,7 +150,6 @@ export default function SettingsScreen() {
       if (!isIntelligentMode) return;
       setIsIntelligentMode(false);
       setCycleLengthInput(cycleLengthDays === null ? "" : String(cycleLengthDays));
-      setPredictionStatusMessage(null);
     }
   };
 
@@ -167,21 +158,19 @@ export default function SettingsScreen() {
       return;
     }
 
-    setStatusMessage(null);
     setIsConfirmingClear(true);
   };
 
   const handleExport = async () => {
     setIsExporting(true);
-    setBackupStatusMessage(null);
     try {
       await exportDatabase();
       // 导出后重新加载数据，确保页面状态与数据库一致。
       await loadSettings();
-      setBackupStatusMessage({ text: "备份导出成功，请妥善保管文件。", tone: "success" });
+      setToastState({ text: "备份导出成功，请妥善保管文件。", tone: "success" });
     } catch (error) {
       const message = error instanceof Error ? error.message : "请稍后重试";
-      setBackupStatusMessage({ text: `导出失败：${message}`, tone: "error" });
+      setToastState({ text: `导出失败：${message}`, tone: "error" });
     } finally {
       setIsExporting(false);
     }
@@ -189,15 +178,14 @@ export default function SettingsScreen() {
 
   const handleImport = async () => {
     setIsImporting(true);
-    setBackupStatusMessage(null);
     try {
       await importDatabaseFromPicker();
       await loadSettings();
-      setBackupStatusMessage({ text: "数据恢复成功。", tone: "success" });
+      setToastState({ text: "数据恢复成功。", tone: "success" });
     } catch (error) {
       const message = error instanceof Error ? error.message : "请稍后重试";
       if (message !== "User canceled") {
-        setBackupStatusMessage({ text: `恢复失败：${message}`, tone: "error" });
+        setToastState({ text: `恢复失败：${message}`, tone: "error" });
       }
     } finally {
       setIsImporting(false);
@@ -216,12 +204,12 @@ export default function SettingsScreen() {
       await clearPeriodRecords();
       setRecordCount(0);
       setIsConfirmingClear(false);
-      setStatusMessage({
+      setToastState({
         text: "清空成功，本机经期记录已全部清空。",
         tone: "success",
       });
     } catch {
-      setStatusMessage({
+      setToastState({
         text: "清空失败，请稍后重试。",
         tone: "error",
       });
@@ -231,7 +219,8 @@ export default function SettingsScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <View style={{ flex: 1 }}>
+      <ScrollView contentContainerStyle={styles.container}>
       <ScreenSection style={styles.headerSection}>
         <Text style={styles.subtleText}>本地数据与隐私</Text>
       </ScreenSection>
@@ -303,11 +292,6 @@ export default function SettingsScreen() {
           </>
         ) : null}
 
-        {predictionStatusMessage ? (
-          <StatusMessage tone={predictionStatusMessage.tone}>
-            {predictionStatusMessage.text}
-          </StatusMessage>
-        ) : null}
       </SectionCard>
 
       <SectionCard style={styles.infoCard}>
@@ -335,11 +319,6 @@ export default function SettingsScreen() {
             {isImporting ? "恢复中..." : "恢复备份"}
           </SecondaryButton>
         </View>
-        {backupStatusMessage ? (
-          <StatusMessage tone={backupStatusMessage.tone}>
-            {backupStatusMessage.text}
-          </StatusMessage>
-        ) : null}
       </SectionCard>
 
       <SectionCard style={styles.dangerCard}>
@@ -367,11 +346,17 @@ export default function SettingsScreen() {
             {isClearing ? "清空中..." : "清空所有记录"}
           </DangerButton>
         )}
-        {statusMessage ? (
-          <StatusMessage tone={statusMessage.tone}>{statusMessage.text}</StatusMessage>
-        ) : null}
       </SectionCard>
     </ScrollView>
+      {toastState && (
+        <Toast
+          key={toastState.text}
+          message={toastState.text}
+          tone={toastState.tone}
+          onDismiss={() => setToastState(null)}
+        />
+      )}
+    </View>
   );
 }
 
