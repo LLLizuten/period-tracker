@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FBE8EC"/>
+      <stop offset="100%" stop-color="#EDDEF5"/>
+    </linearGradient>
+    <radialGradient id="petalCenter" cx="50%" cy="80%" r="80%">
+      <stop offset="0%" stop-color="#F9A8B8"/>
+      <stop offset="100%" stop-color="#E8788C"/>
+    </radialGradient>
+    <radialGradient id="petalOuter" cx="50%" cy="80%" r="80%">
+      <stop offset="0%" stop-color="#F9C6D4"/>
+      <stop offset="100%" stop-color="#F49AAC"/>
+    </radialGradient>
+  </defs>
+
+  <!-- 背景圆角方形 -->
+  <rect x="64" y="64" width="896" height="896" rx="224" ry="224" fill="url(#bg)"/>
+
+  <!-- 五片花瓣 -->
+  <!-- 花瓣1: 顶部 -->
+  <ellipse cx="512" cy="280" rx="72" ry="130" fill="url(#petalOuter)" transform="rotate(0, 512, 280)"/>
+  <!-- 花瓣2: 右上 -->
+  <ellipse cx="660" cy="380" rx="72" ry="130" fill="url(#petalOuter)" transform="rotate(72, 660, 380)"/>
+  <!-- 花瓣3: 右下 -->
+  <ellipse cx="660" cy="580" rx="72" ry="130" fill="url(#petalOuter)" transform="rotate(144, 660, 580)"/>
+  <!-- 花瓣4: 左下 -->
+  <ellipse cx="364" cy="580" rx="72" ry="130" fill="url(#petalOuter)" transform="rotate(216, 364, 580)"/>
+  <!-- 花瓣5: 左上 -->
+  <ellipse cx="364" cy="380" rx="72" ry="130" fill="url(#petalOuter)" transform="rotate(288, 364, 380)"/>
+
+  <!-- 花心 -->
+  <circle cx="512" cy="460" r="72" fill="url(#petalCenter)"/>
+  <!-- 花心小圆点 -->
+  <circle cx="512" cy="460" r="20" fill="#FDE8EC" opacity="0.6"/>
+
+  <!-- 底部微光 -->
+  <ellipse cx="512" cy="780" rx="200" ry="40" fill="#FFF" opacity="0.3"/>
+</svg>

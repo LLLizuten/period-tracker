@@ -1,11 +1,12 @@
 {
   "expo": {
-    "name": "Period Tracker",
+    "name": "怡宝来M了",
     "slug": "period-tracker",
     "scheme": "period-tracker",
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
+    "icon": "./assets/icon.png",
     "plugins": [
       "expo-router",
       "expo-sqlite"
