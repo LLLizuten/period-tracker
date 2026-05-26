@@ -1,6 +1,6 @@
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
-import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 
 import {
   DangerButton,
@@ -37,6 +37,7 @@ export default function SettingsScreen() {
   const [loadError, setLoadError] = useState("");
   const [cycleLengthDays, setCycleLengthDays] = useState<number | null>(null);
   const [cycleLengthInput, setCycleLengthInput] = useState("");
+  const [isIntelligentMode, setIsIntelligentMode] = useState(true);
   const [predictionStatusMessage, setPredictionStatusMessage] = useState<{
     text: string;
     tone: "success" | "error";
@@ -63,6 +64,7 @@ export default function SettingsScreen() {
       if (isActive()) {
         setRecordCount(records.length);
         setCycleLengthDays(predictionSettings.cycleLengthDays);
+        setIsIntelligentMode(predictionSettings.cycleLengthDays === null);
         setCycleLengthInput(
           predictionSettings.cycleLengthDays === null
             ? ""
@@ -130,21 +132,33 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleClearCycleLength = async () => {
-    try {
-      await initPredictionSettingsDatabase();
-      await clearCycleLengthDays();
-      setCycleLengthDays(null);
-      setCycleLengthInput("");
-      setPredictionStatusMessage({
-        text: "已恢复智能预测。",
-        tone: "success",
-      });
-    } catch {
-      setPredictionStatusMessage({
-        text: "恢复失败，请稍后重试。",
-        tone: "error",
-      });
+  const handleModeSwitch = async (newValue: boolean) => {
+    if (newValue === true) {
+      // 切换到智能预测 → 清除固定周期数据
+      if (isIntelligentMode) return;
+      setPredictionStatusMessage(null);
+      try {
+        await initPredictionSettingsDatabase();
+        await clearCycleLengthDays();
+        setCycleLengthDays(null);
+        setCycleLengthInput("");
+        setIsIntelligentMode(true);
+        setPredictionStatusMessage({
+          text: "已切换为智能预测模式。",
+          tone: "success",
+        });
+      } catch {
+        setPredictionStatusMessage({
+          text: "切换失败，请稍后重试。",
+          tone: "error",
+        });
+      }
+    } else {
+      // 切换到固定周期 → 展开输入区
+      if (!isIntelligentMode) return;
+      setIsIntelligentMode(false);
+      setCycleLengthInput(cycleLengthDays === null ? "" : String(cycleLengthDays));
+      setPredictionStatusMessage(null);
     }
   };
 
@@ -241,35 +255,54 @@ export default function SettingsScreen() {
 
       <SectionCard style={styles.infoCard}>
         <LabelText>经期预测设置</LabelText>
-        <Text style={styles.countText}>
-          {cycleLengthDays === null ? "智能预测" : `固定周期：${cycleLengthDays} 天`}
-        </Text>
-        <Text style={styles.bodyText}>未设置周期长度时，将根据历史记录自动估算。</Text>
-        <TextInput
-          value={cycleLengthInput}
-          onChangeText={setCycleLengthInput}
-          placeholder="21-35"
-          keyboardType="number-pad"
-          style={styles.input}
-        />
-        <View style={styles.predictionActions}>
-          <PrimaryButton
-            onPress={() => {
-              void handleSaveCycleLength();
+
+        {/* Switch 行：控制智能预测 / 固定周期 */}
+        <View style={styles.switchRow}>
+          <Text style={styles.switchLabel}>使用智能预测</Text>
+          <Switch
+            value={isIntelligentMode}
+            onValueChange={(newValue) => {
+              void handleModeSwitch(newValue);
             }}
-            style={styles.predictionActionButton}
-          >
-            保存周期
-          </PrimaryButton>
-          <SecondaryButton
-            onPress={() => {
-              void handleClearCycleLength();
-            }}
-            style={styles.predictionActionButton}
-          >
-            使用智能预测
-          </SecondaryButton>
+            trackColor={{ false: colors.border, true: colors.primary }}
+            thumbColor={colors.surface}
+            ios_backgroundColor={colors.border}
+          />
         </View>
+
+        {/* 智能预测模式 — 展示说明 */}
+        {isIntelligentMode ? (
+          <Text style={styles.bodyText}>
+            {recordCount > 0
+              ? `已启用，基于 ${recordCount} 条记录自动估算下次经期。`
+              : "暂无记录，添加记录后将自动启用预测。"}
+          </Text>
+        ) : null}
+
+        {/* 固定周期模式 — 输入 + 保存 */}
+        {!isIntelligentMode ? (
+          <>
+            <View style={styles.inputRow}>
+              <Text style={styles.inputLabel}>固定周期：</Text>
+              <TextInput
+                value={cycleLengthInput}
+                onChangeText={setCycleLengthInput}
+                placeholder="21-35"
+                keyboardType="number-pad"
+                style={styles.input}
+              />
+              <Text style={styles.inputUnit}>天</Text>
+            </View>
+            <PrimaryButton
+              onPress={() => {
+                void handleSaveCycleLength();
+              }}
+            >
+              保存周期
+            </PrimaryButton>
+          </>
+        ) : null}
+
         {predictionStatusMessage ? (
           <StatusMessage tone={predictionStatusMessage.tone}>
             {predictionStatusMessage.text}
@@ -374,9 +407,33 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     color: colors.text,
+    flex: 1,
     fontSize: fontSizes.lg,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
+  },
+  switchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  switchLabel: {
+    color: colors.text,
+    flexShrink: 1,
+    fontSize: fontSizes.lg,
+  },
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  inputLabel: {
+    color: colors.text,
+    fontSize: fontSizes.lg,
+  },
+  inputUnit: {
+    color: colors.textMuted,
+    fontSize: fontSizes.lg,
   },
   predictionActions: {
     flexDirection: "row",

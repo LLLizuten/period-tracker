@@ -1,4 +1,4 @@
-import { Alert, Modal } from "react-native";
+import { Alert, Modal, Switch } from "react-native";
 import { act, create, type ReactTestInstance } from "react-test-renderer";
 
 import SettingsScreen from "../settings";
@@ -41,6 +41,11 @@ type PressableTestProps = {
 
 type TextInputTestProps = {
   onChangeText: (text: string) => void;
+};
+
+type SwitchTestProps = {
+  value: boolean;
+  onValueChange: (value: boolean) => void;
 };
 
 const mockAlert = jest.spyOn(Alert, "alert").mockImplementation(jest.fn());
@@ -128,40 +133,49 @@ describe("SettingsScreen", () => {
     expect(mockListPeriodRecords).toHaveBeenCalled();
     expect(mockGetPredictionSettings).toHaveBeenCalled();
     expect(root.findByProps({ children: "经期预测设置" })).toBeDefined();
-    expect(root.findByProps({ children: "智能预测" })).toBeDefined();
+    expect(root.findByProps({ children: "使用智能预测" })).toBeDefined();
+    // Switch 默认 ON（智能预测模式）
+    expect((root.findByType(Switch).props as SwitchTestProps).value).toBe(true);
+    // 展示智能预测说明文字
     expect(
       root.findByProps({
-        children: "未设置周期长度时，将根据历史记录自动估算。",
+        children: "已启用，基于 1 条记录自动估算下次经期。",
       }),
     ).toBeDefined();
-    expect(findTextInputByPlaceholder(root, "21-35")).toBeDefined();
+    // 固定周期输入区默认隐藏
+    expect(() => findTextInputByPlaceholder(root, "21-35")).toThrow();
     expect(mockAlert).not.toHaveBeenCalled();
   });
 
   test("保存合法固定周期后更新设置状态并展示成功消息", async () => {
     const renderer = await renderSettingsScreen();
+    const root = renderer.root as TestNode;
     mockInitPredictionSettingsDatabase.mockClear();
 
+    // 先切换开关到固定周期模式，显示输入区
     await act(async () => {
-      const input = findTextInputByPlaceholder(renderer.root as TestNode, "21-35");
+      (root.findByType(Switch).props as SwitchTestProps).onValueChange(false);
+    });
+
+    await act(async () => {
+      const input = findTextInputByPlaceholder(root, "21-35");
 
       input.props.onChangeText("30");
     });
 
     await act(async () => {
-      const saveButton = findPressableByText(renderer.root as TestNode, "保存周期");
+      const saveButton = findPressableByText(root, "保存周期");
 
       (saveButton.props as PressableTestProps).onPress?.();
     });
-
-    const root = renderer.root as TestNode;
 
     expect(mockInitPredictionSettingsDatabase).toHaveBeenCalledTimes(1);
     expect(mockInitPredictionSettingsDatabase.mock.invocationCallOrder[0]).toBeLessThan(
       mockSaveCycleLengthDays.mock.invocationCallOrder[0],
     );
     expect(mockSaveCycleLengthDays).toHaveBeenCalledWith(30);
-    expect(root.findByProps({ children: "固定周期：30 天" })).toBeDefined();
+    // Switch 保持 OFF（固定周期模式）
+    expect((root.findByType(Switch).props as SwitchTestProps).value).toBe(false);
     expect(root.findByProps({ children: "周期设置已保存。" })).toBeDefined();
     expect(mockAlert).not.toHaveBeenCalled();
   });
@@ -169,21 +183,25 @@ describe("SettingsScreen", () => {
   test("保存固定周期失败时展示页内错误", async () => {
     mockSaveCycleLengthDays.mockRejectedValue(new Error("保存失败"));
     const renderer = await renderSettingsScreen();
+    const root = renderer.root as TestNode;
     mockInitPredictionSettingsDatabase.mockClear();
 
+    // 先切换开关到固定周期模式
     await act(async () => {
-      const input = findTextInputByPlaceholder(renderer.root as TestNode, "21-35");
+      (root.findByType(Switch).props as SwitchTestProps).onValueChange(false);
+    });
+
+    await act(async () => {
+      const input = findTextInputByPlaceholder(root, "21-35");
 
       input.props.onChangeText("30");
     });
 
     await act(async () => {
-      const saveButton = findPressableByText(renderer.root as TestNode, "保存周期");
+      const saveButton = findPressableByText(root, "保存周期");
 
       (saveButton.props as PressableTestProps).onPress?.();
     });
-
-    const root = renderer.root as TestNode;
 
     expect(mockInitPredictionSettingsDatabase).toHaveBeenCalledTimes(1);
     expect(mockInitPredictionSettingsDatabase.mock.invocationCallOrder[0]).toBeLessThan(
@@ -195,22 +213,28 @@ describe("SettingsScreen", () => {
 
   test("非法周期输入展示页内错误且不保存", async () => {
     const renderer = await renderSettingsScreen();
+    const root = renderer.root as TestNode;
+
+    // 先切换开关到固定周期模式
+    await act(async () => {
+      (root.findByType(Switch).props as SwitchTestProps).onValueChange(false);
+    });
 
     await act(async () => {
-      const input = findTextInputByPlaceholder(renderer.root as TestNode, "21-35");
+      const input = findTextInputByPlaceholder(root, "21-35");
 
       input.props.onChangeText("20");
     });
 
     await act(async () => {
-      const saveButton = findPressableByText(renderer.root as TestNode, "保存周期");
+      const saveButton = findPressableByText(root, "保存周期");
 
       (saveButton.props as PressableTestProps).onPress?.();
     });
 
     expect(mockSaveCycleLengthDays).not.toHaveBeenCalled();
     expect(
-      (renderer.root as TestNode).findByProps({
+      root.findByProps({
         children: "周期长度需为 21-35 天的整数。",
       }),
     ).toBeDefined();
@@ -220,25 +244,27 @@ describe("SettingsScreen", () => {
   test("清空固定周期后恢复智能预测并清空输入", async () => {
     mockGetPredictionSettings.mockResolvedValue({ cycleLengthDays: 28 });
     const renderer = await renderSettingsScreen();
+    const root = renderer.root as TestNode;
     mockInitPredictionSettingsDatabase.mockClear();
 
+    // 加载后 Switch 为 OFF（固定周期模式）
+    expect((root.findByType(Switch).props as SwitchTestProps).value).toBe(false);
+
+    // 点击 Switch 切换到 ON → 清除固定周期
     await act(async () => {
-      const clearButton = findPressableByText(renderer.root as TestNode, "使用智能预测");
-
-      (clearButton.props as PressableTestProps).onPress?.();
+      (root.findByType(Switch).props as SwitchTestProps).onValueChange(true);
     });
-
-    const root = renderer.root as TestNode;
-    const input = findTextInputByPlaceholder(root, "21-35");
 
     expect(mockInitPredictionSettingsDatabase).toHaveBeenCalledTimes(1);
     expect(mockInitPredictionSettingsDatabase.mock.invocationCallOrder[0]).toBeLessThan(
       mockClearCycleLengthDays.mock.invocationCallOrder[0],
     );
     expect(mockClearCycleLengthDays).toHaveBeenCalled();
-    expect(root.findByProps({ children: "智能预测" })).toBeDefined();
-    expect(root.findByProps({ children: "已恢复智能预测。" })).toBeDefined();
-    expect(input.props.value).toBe("");
+    // Switch 为 ON（智能预测模式）
+    expect((root.findByType(Switch).props as SwitchTestProps).value).toBe(true);
+    // 输入区隐藏
+    expect(() => findTextInputByPlaceholder(root, "21-35")).toThrow();
+    expect(root.findByProps({ children: "已切换为智能预测模式。" })).toBeDefined();
     expect(mockAlert).not.toHaveBeenCalled();
   });
 
@@ -246,21 +272,19 @@ describe("SettingsScreen", () => {
     mockGetPredictionSettings.mockResolvedValue({ cycleLengthDays: 28 });
     mockClearCycleLengthDays.mockRejectedValue(new Error("恢复失败"));
     const renderer = await renderSettingsScreen();
+    const root = renderer.root as TestNode;
     mockInitPredictionSettingsDatabase.mockClear();
 
+    // 点击 Switch 切换到 ON → 失败
     await act(async () => {
-      const clearButton = findPressableByText(renderer.root as TestNode, "使用智能预测");
-
-      (clearButton.props as PressableTestProps).onPress?.();
+      (root.findByType(Switch).props as SwitchTestProps).onValueChange(true);
     });
-
-    const root = renderer.root as TestNode;
 
     expect(mockInitPredictionSettingsDatabase).toHaveBeenCalledTimes(1);
     expect(mockInitPredictionSettingsDatabase.mock.invocationCallOrder[0]).toBeLessThan(
       mockClearCycleLengthDays.mock.invocationCallOrder[0],
     );
-    expect(root.findByProps({ children: "恢复失败，请稍后重试。" })).toBeDefined();
+    expect(root.findByProps({ children: "切换失败，请稍后重试。" })).toBeDefined();
     expect(mockAlert).not.toHaveBeenCalled();
   });
 
